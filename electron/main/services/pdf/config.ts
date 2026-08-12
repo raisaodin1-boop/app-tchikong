@@ -14,9 +14,9 @@ export const SCHOOL = {
   name: 'GROUPE SCOLAIRE BILINGUE',
   subtitle: 'PRIMAIRE ET MATERNELLE TCHIKONG',
   address: 'Quartier Nkomo, Douala — Cameroun',
-  phone: 'Tél : +237 6XX XXX XXX',
-  email: 'contact@tchikong.cm',
-  bp: 'B.P. XXXX Douala'
+  phone: '',
+  email: '',
+  bp: ''
 }
 
 export const COLORS = {
@@ -31,6 +31,7 @@ export const COLORS = {
   tableHeaderText: rgb(1, 1, 1) as RGB,
   tableRowAlt: rgb(0.97, 0.97, 0.99) as RGB,
   success: rgb(0.09, 0.64, 0.29) as RGB,
+  danger: rgb(0.86, 0.15, 0.15) as RGB,
   white: rgb(1, 1, 1) as RGB
 }
 

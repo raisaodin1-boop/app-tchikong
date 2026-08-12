@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileDown, RefreshCw, Printer } from 'lucide-react'
+import { Award, FileDown, Medal, RefreshCw, Printer, Sparkles, Users } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
 import type { Bulletin, EleveMoyenne, PeriodeEvaluation } from '@shared/types'
@@ -28,6 +28,7 @@ type BulletinRow = {
   moyenne: number
   rang: number
   mention: string
+  appreciation: string
 }
 
 export default function BulletinsPage() {
@@ -64,6 +65,14 @@ export default function BulletinsPage() {
     ])
 
     if (bulletins.length > 0) {
+      setAppreciations(
+        Object.fromEntries(
+          bulletins.map((bulletin) => [
+            bulletin.eleve_id,
+            bulletin.appreciation_maitre || ''
+          ])
+        )
+      )
       setRows(
         bulletins.map((b) => ({
           eleve_id: b.eleve_id,
@@ -72,7 +81,8 @@ export default function BulletinsPage() {
           matricule: b.matricule,
           moyenne: b.moyenne_generale,
           rang: b.rang,
-          mention: b.mention
+          mention: b.mention,
+          appreciation: b.appreciation_maitre || ''
         }))
       )
     } else {
@@ -86,7 +96,8 @@ export default function BulletinsPage() {
             matricule: m.matricule,
             moyenne: m.moyenne,
             rang: m.rang,
-            mention: m.mention
+            mention: m.mention,
+            appreciation: ''
           }))
       )
     }
@@ -99,24 +110,52 @@ export default function BulletinsPage() {
   const handleGenerer = async () => {
     if (!token || !classeId || !periodeId) return
     setGenerating(true)
-    await window.api.genererBulletins(classeId, periodeId, appreciations, token)
-    await loadData()
-    setGenerating(false)
+    try {
+      await window.api.genererBulletins(classeId, periodeId, appreciations, token)
+      await loadData()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'La génération des bulletins a échoué')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   const handleExportPdf = async (eleveId: number, action: 'save' | 'print') => {
     setExporting(eleveId)
-    const result = await window.api.exportBulletinPdf(eleveId, periodeId, action)
-    if (result.success) {
-      if (action === 'save' && result.path) alert(`Bulletin enregistré : ${result.path}`)
-    } else if (result.error) {
-      alert(result.error)
+    try {
+      const result = await window.api.exportBulletinPdf(eleveId, periodeId, action)
+      if (result.success) {
+        if (action === 'save' && result.path) alert(`Bulletin enregistré : ${result.path}`)
+      } else if (result.error) {
+        alert(result.error)
+      }
+    } finally {
+      setExporting(null)
     }
-    setExporting(null)
   }
+
+  const classAverage =
+    rows.length > 0 ? rows.reduce((sum, row) => sum + row.moyenne, 0) / rows.length : 0
 
   return (
     <div>
+      <div className="mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-tchikong-700 via-tchikong-600 to-blue-600 p-6 text-white shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-white/15 p-3">
+            <Sparkles className="h-7 w-7 text-yellow-300" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-100">
+              Édition premium certifiée
+            </p>
+            <h2 className="text-2xl font-bold">Studio des bulletins</h2>
+            <p className="mt-1 text-sm text-blue-100">
+              Classement, statistiques comparatives, appréciations et QR d’authenticité
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="card p-4 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -156,6 +195,23 @@ export default function BulletinsPage() {
           {generating ? 'Génération...' : 'Calculer moyennes et générer bulletins'}
         </button>
       </div>
+
+      {rows.length > 0 && (
+        <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="card flex items-center gap-3 p-4">
+            <Users className="h-8 w-8 text-blue-600" />
+            <div><p className="text-xs text-gray-400">Effectif évalué</p><p className="text-xl font-bold">{rows.length}</p></div>
+          </div>
+          <div className="card flex items-center gap-3 p-4">
+            <Award className="h-8 w-8 text-tchikong-600" />
+            <div><p className="text-xs text-gray-400">Moyenne de classe</p><p className="text-xl font-bold">{classAverage.toFixed(2)}/20</p></div>
+          </div>
+          <div className="card flex items-center gap-3 p-4">
+            <Medal className="h-8 w-8 text-yellow-500" />
+            <div><p className="text-xs text-gray-400">Meilleure moyenne</p><p className="text-xl font-bold">{Math.max(...rows.map((row) => row.moyenne)).toFixed(2)}/20</p></div>
+          </div>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="card p-8 text-center text-gray-400">

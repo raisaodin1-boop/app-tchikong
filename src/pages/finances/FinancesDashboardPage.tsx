@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Wallet, TrendingUp, AlertTriangle, Users, ArrowRight, Receipt } from 'lucide-react'
+import { Wallet, TrendingUp, AlertTriangle, Users, ArrowRight, Receipt, BarChart3 } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import type { FinancesDashboard } from '@shared/types'
 
@@ -143,7 +143,7 @@ export default function FinancesDashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-6">
         <Link to="/finances/paiement" className="card p-4 hover:shadow-md transition-shadow flex items-center gap-3">
           <Wallet className="h-8 w-8 text-accent-green" />
           <div>
@@ -163,6 +163,13 @@ export default function FinancesDashboardPage() {
           <div>
             <p className="font-medium">Journal des dépenses</p>
             <p className="text-xs text-gray-400">Salaires, charges, fournitures</p>
+          </div>
+        </Link>
+        <Link to="/finances/bilan" className="card p-4 hover:shadow-md transition-shadow flex items-center gap-3">
+          <BarChart3 className="h-8 w-8 text-blue-600" />
+          <div>
+            <p className="font-medium">Bilan annuel</p>
+            <p className="text-xs text-gray-400">Recettes, impayés, salaires et solde</p>
           </div>
         </Link>
       </div>

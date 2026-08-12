@@ -38,6 +38,7 @@ export interface EleveMoyenne {
     note_sur: number
     note_sur_20: number
     moyenne_matiere: number
+    appreciation: string | null
   }[]
 }
 
@@ -49,6 +50,12 @@ export interface BulletinData {
   moyenne: EleveMoyenne
   appreciation_maitre: string | null
   bulletin: Bulletin | null
+  statistiques_classe: {
+    moyenne_classe: number
+    meilleure_moyenne: number
+    plus_faible_moyenne: number
+    effectif: number
+  }
 }
 
 export function listMatieres(sectionId: number): Matiere[] {
@@ -146,12 +153,16 @@ export function saveNotes(
   const transaction = db.transaction(() => {
     for (const n of notes) {
       if (n.valeur === null || n.valeur === undefined || isNaN(n.valeur)) continue
+      const noteSur = n.note_sur ?? 20
+      if (noteSur <= 0 || n.valeur < 0 || n.valeur > noteSur) {
+        throw new Error(`Note invalide pour l'élève ${n.eleve_id} : valeur attendue entre 0 et ${noteSur}`)
+      }
       upsert.run(
         n.eleve_id,
         matiereId,
         periodeId,
         n.valeur,
-        n.note_sur ?? 20,
+        noteSur,
         matiere?.coefficient ?? 1,
         n.appreciation ?? null
       )
@@ -202,7 +213,8 @@ export function calculerMoyennesClasse(classeId: number, periodeId: number): Ele
         valeur: note.valeur,
         note_sur: note.note_sur,
         note_sur_20: Math.round(noteSur20 * 100) / 100,
-        moyenne_matiere: Math.round(noteSur20 * 100) / 100
+        moyenne_matiere: Math.round(noteSur20 * 100) / 100,
+        appreciation: note.appreciation ?? null
       })
     }
 
@@ -339,6 +351,12 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
   const bulletin = db
     .prepare('SELECT * FROM bulletins WHERE eleve_id = ? AND periode_id = ?')
     .get(eleveId, periodeId) as Bulletin | undefined
+  const ranked = moyennes.filter((item) => item.details.length > 0)
+  const moyenneClasse =
+    ranked.length > 0
+      ? Math.round((ranked.reduce((sum, item) => sum + item.moyenne, 0) / ranked.length) * 100) /
+        100
+      : 0
 
   return {
     eleve,
@@ -351,7 +369,14 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
     annee_libelle: inscription.annee_libelle,
     moyenne,
     appreciation_maitre: bulletin?.appreciation_maitre ?? null,
-    bulletin: bulletin ?? null
+    bulletin: bulletin ?? null,
+    statistiques_classe: {
+      moyenne_classe: moyenneClasse,
+      meilleure_moyenne: ranked.length > 0 ? Math.max(...ranked.map((item) => item.moyenne)) : 0,
+      plus_faible_moyenne:
+        ranked.length > 0 ? Math.min(...ranked.map((item) => item.moyenne)) : 0,
+      effectif: ranked.length
+    }
   }
 }
 

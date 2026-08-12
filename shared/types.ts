@@ -437,6 +437,7 @@ export interface EleveMoyenne {
     note_sur: number
     note_sur_20: number
     moyenne_matiere: number
+    appreciation: string | null
   }[]
 }
 
@@ -448,6 +449,12 @@ export interface BulletinData {
   moyenne: EleveMoyenne
   appreciation_maitre: string | null
   bulletin: Bulletin | null
+  statistiques_classe: {
+    moyenne_classe: number
+    meilleure_moyenne: number
+    plus_faible_moyenne: number
+    effectif: number
+  }
 }
 
 // --- Finances ---
@@ -497,6 +504,98 @@ export interface FinancesDashboard {
   montant_impayes: number
   paiements_recents: (Paiement & { nom: string; prenom: string; matricule: string })[]
   recettes_par_section: { section: string; montant: number }[]
+}
+
+export interface PersonnelAnneeDetail {
+  id: number
+  personnel_id: number
+  annee_scolaire_id: number
+  salaire_mensuel: number
+  date_debut: string | null
+  date_fin: string | null
+  actif: boolean
+  matricule: string
+  nom: string
+  prenom: string
+  poste: PostePersonnel
+}
+
+export interface PaieMensuelleRow extends PersonnelAnneeDetail {
+  salaire_id: number | null
+  mois: string
+  montant_du: number
+  montant_paye: number
+  statut: 'non_configure' | 'a_payer' | 'paye'
+  date_paiement: string | null
+  mode_paiement: ModePaiement | null
+  reference: string | null
+}
+
+export interface PaieMensuelle {
+  mois: string
+  rows: PaieMensuelleRow[]
+  total_du: number
+  total_paye: number
+  total_restant: number
+  payes: number
+  a_payer: number
+}
+
+export interface SalairePersonnelFormData {
+  personnel_id: number
+  annee_scolaire_id: number
+  salaire_mensuel: number
+  actif?: boolean
+}
+
+export interface ValidationSalaireData {
+  salaire_id: number
+  date_paiement: string
+  mode_paiement: ModePaiement
+  reference?: string
+  notes?: string
+}
+
+export interface BilanClasse {
+  classe_id: number
+  classe_nom: string
+  section_code: string
+  effectif: number
+  montant_attendu: number
+  montant_percu: number
+  montant_non_percu: number
+  taux_recouvrement: number
+}
+
+export interface BilanEleve {
+  eleve_id: number
+  matricule: string
+  nom: string
+  prenom: string
+  classe_nom: string
+  section_code: string
+  montant_attendu: number
+  montant_percu: number
+  montant_non_percu: number
+  statut: 'a_jour' | 'partiel' | 'impaye'
+}
+
+export interface BilanAnnuel {
+  annee_id: number
+  annee_libelle: string
+  effectif_total: number
+  montant_attendu: number
+  montant_percu: number
+  montant_non_percu: number
+  taux_recouvrement: number
+  depenses_hors_salaires: number
+  salaires_attendus: number
+  salaires_payes: number
+  salaires_non_payes: number
+  depenses_totales: number
+  solde: number
+  classes: BilanClasse[]
+  eleves: BilanEleve[]
 }
 
 export interface PaiementFormData {
@@ -776,6 +875,14 @@ export const IPC_CHANNELS = {
   FINANCES_IMPAYES_PDF: 'finances:impayesPdf',
   FINANCES_DEPENSE_LIST: 'finances:depenseList',
   FINANCES_DEPENSE_CREATE: 'finances:depenseCreate',
+  FINANCES_BILAN_ANNUEL: 'finances:bilanAnnuel',
+
+  // Paie du personnel
+  PAIE_PERSONNEL_ANNEE: 'paie:personnelAnnee',
+  PAIE_PERSONNEL_INITIALISER: 'paie:personnelInitialiser',
+  PAIE_SALAIRE_CONFIGURER: 'paie:salaireConfigurer',
+  PAIE_MENSUELLE: 'paie:mensuelle',
+  PAIE_VALIDER: 'paie:valider',
 
   // Administratif
   ADMIN_DASHBOARD: 'admin:dashboard',

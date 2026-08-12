@@ -1,5 +1,6 @@
 import { getDb, logActivity } from '@database'
 import type {
+  BilanAnnuel,
   Depense,
   FraisConfiguration,
   FraisConfigurationFormData,
@@ -705,4 +706,162 @@ export function createDepense(
   return getDb()
     .prepare('SELECT * FROM depenses WHERE id = ?')
     .get(result.lastInsertRowid) as Depense
+}
+
+export function getBilanAnnuel(anneeScolaireId: number): BilanAnnuel {
+  const db = getDb()
+  const year = db
+    .prepare('SELECT * FROM annees_scolaires WHERE id = ?')
+    .get(anneeScolaireId) as
+    | { id: number; libelle: string; date_debut: string; date_fin: string }
+    | undefined
+  if (!year) throw new Error('Année scolaire introuvable')
+
+  const classes = db
+    .prepare(
+      `SELECT c.id, c.nom, s.code as section_code,
+              COUNT(i.id) as effectif
+       FROM classes c
+       JOIN sections s ON s.id = c.section_id
+       LEFT JOIN inscriptions i ON i.classe_id = c.id AND i.statut = 'actif'
+       WHERE c.annee_scolaire_id = ?
+       GROUP BY c.id
+       ORDER BY s.code, c.nom`
+    )
+    .all(anneeScolaireId) as {
+    id: number
+    nom: string
+    section_code: string
+    effectif: number
+  }[]
+
+  const classRows = classes.map((classe) => {
+    const fees = (
+      db
+        .prepare(
+          `SELECT COALESCE(SUM(m.montant), 0) as total
+           FROM frais_modeles f
+           JOIN frais_montants m ON m.frais_modele_id = f.id
+           WHERE f.annee_scolaire_id = ?
+             AND (
+               (f.mode_tarification = 'unique' AND m.classe_id IS NULL)
+               OR (f.mode_tarification = 'par_classe' AND m.classe_id = ?)
+             )`
+        )
+        .get(anneeScolaireId, classe.id) as { total: number }
+    ).total
+    const received = (
+      db
+        .prepare(
+          `SELECT COALESCE(SUM(p.montant), 0) as total
+           FROM paiements p
+           JOIN inscriptions i ON i.eleve_id = p.eleve_id
+             AND i.annee_scolaire_id = p.annee_scolaire_id
+           WHERE p.annee_scolaire_id = ? AND i.classe_id = ?`
+        )
+        .get(anneeScolaireId, classe.id) as { total: number }
+    ).total
+    const expected = fees * classe.effectif
+    return {
+      classe_id: classe.id,
+      classe_nom: classe.nom,
+      section_code: classe.section_code,
+      effectif: classe.effectif,
+      montant_attendu: expected,
+      montant_percu: received,
+      montant_non_percu: Math.max(0, expected - received),
+      taux_recouvrement: expected > 0 ? Math.round((received / expected) * 10000) / 100 : 0
+    }
+  })
+
+  const effectifTotal = classRows.reduce((sum, row) => sum + row.effectif, 0)
+  const expectedTotal = classRows.reduce((sum, row) => sum + row.montant_attendu, 0)
+  const receivedTotal = classRows.reduce((sum, row) => sum + row.montant_percu, 0)
+  const expenses = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(montant), 0) as total,
+         COALESCE(SUM(CASE WHEN type = 'salaire' THEN montant ELSE 0 END), 0) as salaires,
+         COALESCE(SUM(CASE WHEN type != 'salaire' THEN montant ELSE 0 END), 0) as autres
+       FROM depenses WHERE annee_scolaire_id = ?`
+    )
+    .get(anneeScolaireId) as { total: number; salaires: number; autres: number }
+
+  const personnelYears = db
+    .prepare(
+      `SELECT salaire_mensuel, date_debut, date_fin
+       FROM personnel_annees WHERE annee_scolaire_id = ?`
+    )
+    .all(anneeScolaireId) as {
+    salaire_mensuel: number
+    date_debut: string | null
+    date_fin: string | null
+  }[]
+  const salaryExpected = personnelYears.reduce((total, member) => {
+    const start = new Date(`${maxDate(member.date_debut, year.date_debut)}T00:00:00`)
+    const end = new Date(`${minDate(member.date_fin, year.date_fin)}T00:00:00`)
+    const months =
+      (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1
+    return total + member.salaire_mensuel * Math.max(0, months)
+  }, 0)
+  const enrolledStudents = db
+    .prepare(
+      `SELECT e.id, e.matricule, e.nom, e.prenom, c.nom as classe_nom, s.code as section_code
+       FROM inscriptions i
+       JOIN eleves e ON e.id = i.eleve_id
+       JOIN classes c ON c.id = i.classe_id
+       JOIN sections s ON s.id = i.section_id
+       WHERE i.annee_scolaire_id = ? AND i.statut = 'actif'
+       ORDER BY s.code, c.nom, e.nom, e.prenom`
+    )
+    .all(anneeScolaireId) as {
+    id: number
+    matricule: string
+    nom: string
+    prenom: string
+    classe_nom: string
+    section_code: string
+  }[]
+  const studentRows = enrolledStudents.map((student) => {
+    const situation = getSituationFinanciere(student.id, anneeScolaireId)
+    return {
+      eleve_id: student.id,
+      matricule: student.matricule,
+      nom: student.nom,
+      prenom: student.prenom,
+      classe_nom: student.classe_nom,
+      section_code: student.section_code,
+      montant_attendu: situation?.total_du ?? 0,
+      montant_percu: situation?.total_paye ?? 0,
+      montant_non_percu: situation?.reste ?? 0,
+      statut: situation?.statut ?? ('a_jour' as const)
+    }
+  })
+
+  return {
+    annee_id: year.id,
+    annee_libelle: year.libelle,
+    effectif_total: effectifTotal,
+    montant_attendu: expectedTotal,
+    montant_percu: receivedTotal,
+    montant_non_percu: Math.max(0, expectedTotal - receivedTotal),
+    taux_recouvrement:
+      expectedTotal > 0 ? Math.round((receivedTotal / expectedTotal) * 10000) / 100 : 0,
+    depenses_hors_salaires: expenses.autres,
+    salaires_attendus: salaryExpected,
+    salaires_payes: expenses.salaires,
+    salaires_non_payes: Math.max(0, salaryExpected - expenses.salaires),
+    depenses_totales: expenses.total,
+    solde: receivedTotal - expenses.total,
+    classes: classRows,
+    eleves: studentRows
+  }
+}
+
+function maxDate(value: string | null, fallback: string): string {
+  return value && value > fallback ? value : fallback
+}
+
+function minDate(value: string | null, fallback: string): string {
+  return value && value < fallback ? value : fallback
 }

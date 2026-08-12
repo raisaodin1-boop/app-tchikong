@@ -9,7 +9,6 @@ function formatMoney(n: number) {
 }
 
 const TYPE_OPTIONS: { value: TypeDepense; label: string }[] = [
-  { value: 'salaire', label: 'Salaire' },
   { value: 'charge', label: 'Charge' },
   { value: 'fourniture', label: 'Fourniture' },
   { value: 'maintenance', label: 'Maintenance' },
@@ -67,6 +66,7 @@ export default function DepensesPage() {
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-500">
           Total des dépenses : <strong className="text-accent-red">{formatMoney(total)}</strong>
+          <span className="ml-2 text-xs">Les salaires sont ajoutés depuis Administration → Paie.</span>
         </p>
         <button className="btn-primary btn-sm" onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4" />

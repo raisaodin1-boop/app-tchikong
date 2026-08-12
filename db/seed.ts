@@ -478,6 +478,7 @@ export function seedPersonnelDemo(): { message: string; count: number } {
 
   const existing = (db.prepare('SELECT COUNT(*) as c FROM enseignants').get() as { c: number }).c
   if (existing > 0) {
+    seedPayrollDemo()
     return { message: 'Personnel de démonstration déjà présent', count: existing }
   }
 
@@ -502,6 +503,39 @@ export function seedPersonnelDemo(): { message: string; count: number } {
   for (const p of personnel) {
     insert.run(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7])
   }
+  seedPayrollDemo()
 
   return { message: `${personnel.length} membres du personnel créés`, count: personnel.length }
+}
+
+function seedPayrollDemo(): void {
+  const db = getDb()
+  const year = db
+    .prepare('SELECT id, date_debut FROM annees_scolaires WHERE active = 1')
+    .get() as { id: number; date_debut: string } | undefined
+  if (!year) return
+
+  const personnel = db
+    .prepare('SELECT id, poste FROM enseignants WHERE actif = 1')
+    .all() as { id: number; poste: string }[]
+  const insert = db.prepare(
+    `INSERT INTO personnel_annees
+      (personnel_id, annee_scolaire_id, salaire_mensuel, date_debut, actif)
+     VALUES (?, ?, ?, ?, 1)
+     ON CONFLICT(personnel_id, annee_scolaire_id)
+     DO UPDATE SET salaire_mensuel =
+       CASE WHEN personnel_annees.salaire_mensuel = 0 THEN excluded.salaire_mensuel
+            ELSE personnel_annees.salaire_mensuel END`
+  )
+  const salaries: Record<string, number> = {
+    directrice: 250000,
+    comptable: 180000,
+    secretaire: 150000,
+    surveillant: 130000,
+    enseignant: 140000,
+    autre: 120000
+  }
+  for (const member of personnel) {
+    insert.run(member.id, year.id, salaries[member.poste] ?? 120000, year.date_debut)
+  }
 }

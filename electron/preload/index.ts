@@ -181,10 +181,40 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DEPENSE_LIST, anneeId),
   createDepense: (data: object, token: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DEPENSE_CREATE, data, token),
+  getBilanAnnuel: (
+    anneeId: number,
+    token: string
+  ): Promise<import('../../shared/types').BilanAnnuel> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_BILAN_ANNUEL, anneeId, token),
   exportRecuPdf: (paiementId: number, action?: 'save' | 'print') =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_RECU_PDF, paiementId, action ?? 'save'),
   exportImpayesPdf: (anneeId: number, anneeLibelle: string, action?: 'save' | 'print') =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES_PDF, anneeId, anneeLibelle, action ?? 'save'),
+
+  // Paie du personnel
+  listPersonnelAnnee: (
+    anneeId: number,
+    token: string
+  ): Promise<import('../../shared/types').PersonnelAnneeDetail[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_PERSONNEL_ANNEE, anneeId, token),
+  initializePersonnelAnnee: (anneeId: number, token: string): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_PERSONNEL_INITIALISER, anneeId, token),
+  configureSalaire: (
+    data: import('../../shared/types').SalairePersonnelFormData,
+    token: string
+  ): Promise<import('../../shared/types').PersonnelAnneeDetail> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_SALAIRE_CONFIGURER, data, token),
+  getPaieMensuelle: (
+    anneeId: number,
+    month: string,
+    token: string
+  ): Promise<import('../../shared/types').PaieMensuelle> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_MENSUELLE, anneeId, month, token),
+  validateSalairePayment: (
+    data: import('../../shared/types').ValidationSalaireData,
+    token: string
+  ): Promise<import('../../shared/types').PaieMensuelleRow> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_VALIDER, data, token),
 
   // Administratif
   getAdminDashboard: (anneeId?: number): Promise<import('../../shared/types').AdminDashboard> =>

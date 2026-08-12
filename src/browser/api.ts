@@ -6,6 +6,7 @@ import * as scolariteService from '../../electron/main/services/scolarite'
 import * as documentsService from '../../electron/main/services/documents'
 import * as financesService from '../../electron/main/services/finances'
 import * as adminService from '../../electron/main/services/admin'
+import * as payrollService from '../../electron/main/services/payroll'
 import { generatePdf, getDefaultFilename, type PdfPayload } from '../../electron/main/services/pdf'
 import type { DocumentType } from '../../electron/main/services/pdf/config'
 import { seedDemoData, seedReferenceData } from '../../db/seed'
@@ -38,6 +39,13 @@ function requireDirector(token: string): void {
   const session = authService.getSession(token)
   if (!session || session.utilisateur.role !== 'directrice') {
     throw new Error('Accès réservé à la directrice')
+  }
+}
+
+function requireFinanceAccess(token: string): void {
+  const session = authService.getSession(token)
+  if (!session || !['directrice', 'comptable'].includes(session.utilisateur.role)) {
+    throw new Error('Accès réservé à la direction et à la comptabilité')
   }
 }
 
@@ -325,6 +333,10 @@ const browserApi = {
         userId(token)
       )
     ),
+  getBilanAnnuel: async (anneeId: number, token: string) => {
+    requireFinanceAccess(token)
+    return financesService.getBilanAnnuel(anneeId)
+  },
   exportRecuPdf: async (paiementId: number, action: 'save' | 'print' = 'save') => {
     const data = financesService.getRecuData(paiementId)
     if (!data) return { success: false, error: 'Paiement introuvable' }
@@ -343,6 +355,33 @@ const browserApi = {
       action,
       anneeLibelle || 'impayes'
     ),
+
+  listPersonnelAnnee: async (anneeId: number, token: string) => {
+    requireDirector(token)
+    return payrollService.listPersonnelAnnee(anneeId)
+  },
+  initializePersonnelAnnee: async (anneeId: number, token: string) => {
+    requireDirector(token)
+    return mutate(() => payrollService.initializePersonnelAnnee(anneeId, userId(token)))
+  },
+  configureSalaire: async (
+    data: import('../../shared/types').SalairePersonnelFormData,
+    token: string
+  ) => {
+    requireDirector(token)
+    return mutate(() => payrollService.configureSalaire(data, userId(token)))
+  },
+  getPaieMensuelle: async (anneeId: number, month: string, token: string) => {
+    requireDirector(token)
+    return mutate(() => payrollService.getPaieMensuelle(anneeId, month))
+  },
+  validateSalairePayment: async (
+    data: import('../../shared/types').ValidationSalaireData,
+    token: string
+  ) => {
+    requireDirector(token)
+    return mutate(() => payrollService.validateSalairePayment(data, userId(token)))
+  },
 
   getAdminDashboard: async (anneeId?: number) => adminService.getAdminDashboard(anneeId),
   listPersonnel: async (actifOnly?: boolean) => adminService.listPersonnel(actifOnly),

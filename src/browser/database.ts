@@ -3,6 +3,7 @@ import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 import migrationSql from '../../db/migrations/001_initial_schema.sql?raw'
 import settingsMigrationSql from '../../db/migrations/002_app_settings.sql?raw'
 import feeModulesMigrationSql from '../../db/migrations/003_fee_modules.sql?raw'
+import payrollMigrationSql from '../../db/migrations/004_payroll.sql?raw'
 
 const STORAGE_DB = 'tchikong-offline-storage'
 const STORAGE_VERSION = 1
@@ -156,7 +157,8 @@ function runBrowserMigrations(db: Database): void {
   const migrations = [
     { version: 1, name: 'initial_schema', sql: migrationSql },
     { version: 2, name: 'app_settings', sql: settingsMigrationSql },
-    { version: 3, name: 'fee_modules', sql: feeModulesMigrationSql }
+    { version: 3, name: 'fee_modules', sql: feeModulesMigrationSql },
+    { version: 4, name: 'payroll', sql: payrollMigrationSql }
   ]
 
   for (const migration of migrations) {

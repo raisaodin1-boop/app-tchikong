@@ -426,6 +426,8 @@ export function exitDemoMode(userId?: number): DemoResetResult {
     db.prepare('DELETE FROM affectations_enseignants').run()
     db.prepare('DELETE FROM emplois_du_temps').run()
     db.prepare('DELETE FROM presences_personnel').run()
+    db.prepare('DELETE FROM salaires_mensuels').run()
+    db.prepare('DELETE FROM personnel_annees').run()
     db.prepare('DELETE FROM enseignants').run()
 
     db.prepare('DELETE FROM depenses').run()

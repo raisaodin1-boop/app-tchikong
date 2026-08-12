@@ -17,12 +17,14 @@ import PaiementPage from './pages/finances/PaiementPage'
 import HistoriquePage from './pages/finances/HistoriquePage'
 import ImpayesPage from './pages/finances/ImpayesPage'
 import DepensesPage from './pages/finances/DepensesPage'
+import BilanAnnuelPage from './pages/finances/BilanAnnuelPage'
 import AdminPage from './pages/admin/AdminPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import PersonnelPage from './pages/admin/PersonnelPage'
 import ClassesPage from './pages/admin/ClassesPage'
 import FraisScolairesPage from './pages/admin/FraisScolairesPage'
 import AnneesScolairesPage from './pages/admin/AnneesScolairesPage'
+import PaiePersonnelPage from './pages/admin/PaiePersonnelPage'
 import UtilisateursPage from './pages/admin/UtilisateursPage'
 import DocumentsPage from './pages/admin/DocumentsPage'
 import JournalPage from './pages/admin/JournalPage'
@@ -79,6 +81,7 @@ export default function App() {
           <Route path="historique" element={<HistoriquePage />} />
           <Route path="impayes" element={<ImpayesPage />} />
           <Route path="depenses" element={<DepensesPage />} />
+          <Route path="bilan" element={<BilanAnnuelPage />} />
         </Route>
         <Route path="admin" element={<AdminPage />}>
           <Route index element={<AdminDashboardPage />} />
@@ -97,6 +100,14 @@ export default function App() {
             element={
               <DirectriceRoute>
                 <AnneesScolairesPage />
+              </DirectriceRoute>
+            }
+          />
+          <Route
+            path="paie"
+            element={
+              <DirectriceRoute>
+                <PaiePersonnelPage />
               </DirectriceRoute>
             }
           />

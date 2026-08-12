@@ -1,4 +1,5 @@
 import { getDb, logActivity } from '@database'
+import { initializePersonnelAnnee } from './payroll'
 import type {
   AnneeScolaire,
   Classe,
@@ -143,6 +144,7 @@ export function startNewAnnee(
     )
   })
   create()
+  initializePersonnelAnnee(anneeId, userId)
 
   const annee = db
     .prepare('SELECT * FROM annees_scolaires WHERE id = ?')

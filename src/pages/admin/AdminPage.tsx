@@ -7,7 +7,8 @@ import {
   FileText,
   ScrollText,
   Receipt,
-  CalendarRange
+  CalendarRange,
+  Banknote
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -17,6 +18,7 @@ const tabs = [
   { to: '/admin/classes', icon: GraduationCap, label: 'Classes' },
   { to: '/admin/annees', icon: CalendarRange, label: 'Années scolaires', directriceOnly: true },
   { to: '/admin/frais', icon: Receipt, label: 'Frais scolaires', directriceOnly: true },
+  { to: '/admin/paie', icon: Banknote, label: 'Paie du personnel', directriceOnly: true },
   { to: '/admin/utilisateurs', icon: UserCog, label: 'Utilisateurs', directriceOnly: true },
   { to: '/admin/documents', icon: FileText, label: 'Documents' },
   { to: '/admin/journal', icon: ScrollText, label: 'Journal' }

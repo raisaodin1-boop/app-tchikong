@@ -8,6 +8,7 @@ import * as scolariteService from '../services/scolarite'
 import * as documentsService from '../services/documents'
 import * as financesService from '../services/finances'
 import * as adminService from '../services/admin'
+import * as payrollService from '../services/payroll'
 import { handlePdfAction, handlePdfPrint } from '../services/pdf-handler'
 import { backupDatabase, restoreDatabase, getDbPath } from '../../../db/database'
 import { seedDemoData, seedReferenceData } from '../../../db/seed'
@@ -292,6 +293,13 @@ export function registerIpcHandlers(): void {
     const userId = authService.getCurrentUserId(token)
     return financesService.createDepense(data, userId ?? undefined)
   })
+  ipcMain.handle(IPC_CHANNELS.FINANCES_BILAN_ANNUEL, (_, anneeId, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'comptable'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et à la comptabilité')
+    }
+    return financesService.getBilanAnnuel(anneeId)
+  })
   ipcMain.handle(IPC_CHANNELS.FINANCES_RECU_PDF, async (_, paiementId, action = 'save') => {
     const data = financesService.getRecuData(paiementId)
     if (!data) return { success: false, error: 'Paiement introuvable' }
@@ -310,6 +318,43 @@ export function registerIpcHandlers(): void {
       anneeLibelle || 'impayes',
       'Liste des impayés'
     )
+  })
+
+  // --- Paie du personnel ---
+  ipcMain.handle(IPC_CHANNELS.PAIE_PERSONNEL_ANNEE, (_, anneeId, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.listPersonnelAnnee(anneeId)
+  })
+  ipcMain.handle(IPC_CHANNELS.PAIE_PERSONNEL_INITIALISER, (_, anneeId, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.initializePersonnelAnnee(anneeId, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.PAIE_SALAIRE_CONFIGURER, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.configureSalaire(data, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.PAIE_MENSUELLE, (_, anneeId, month, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.getPaieMensuelle(anneeId, month)
+  })
+  ipcMain.handle(IPC_CHANNELS.PAIE_VALIDER, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.validateSalairePayment(data, session.utilisateur.id)
   })
 
   // --- Administratif ---
