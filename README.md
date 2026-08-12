@@ -8,7 +8,7 @@ Application desktop de gestion scolaire pour le **Groupe Scolaire Bilingue Prima
 - **React + TypeScript** — interface utilisateur
 - **SQLite** (`better-sqlite3`) — base de données locale
 - **Tailwind CSS** — design moderne et productif
-- **pdf-lib** — génération de documents PDF (bulletins, reçus)
+- **pdf-lib** — moteur PDF professionnel hors-ligne (bulletins, attestations, palmarès, listes)
 
 ## Fonctionnalités (V1 en cours)
 

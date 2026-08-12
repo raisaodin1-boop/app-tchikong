@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileDown, RefreshCw } from 'lucide-react'
+import { FileDown, RefreshCw, Printer } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
 import type { Bulletin, EleveMoyenne, PeriodeEvaluation } from '@shared/types'
@@ -104,11 +104,11 @@ export default function BulletinsPage() {
     setGenerating(false)
   }
 
-  const handleExportPdf = async (eleveId: number) => {
+  const handleExportPdf = async (eleveId: number, action: 'save' | 'print') => {
     setExporting(eleveId)
-    const result = await window.api.exportBulletinPdf(eleveId, periodeId)
+    const result = await window.api.exportBulletinPdf(eleveId, periodeId, action)
     if (result.success) {
-      alert(`Bulletin enregistré : ${result.path}`)
+      if (action === 'save' && result.path) alert(`Bulletin enregistré : ${result.path}`)
     } else if (result.error) {
       alert(result.error)
     }
@@ -173,7 +173,7 @@ export default function BulletinsPage() {
                 <th>Moyenne</th>
                 <th>Mention</th>
                 <th>Appréciation maître</th>
-                <th className="w-24">PDF</th>
+                <th className="w-36">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -204,14 +204,24 @@ export default function BulletinsPage() {
                     />
                   </td>
                   <td>
-                    <button
-                      className="btn-secondary btn-sm"
-                      onClick={() => handleExportPdf(row.eleve_id)}
-                      disabled={exporting === row.eleve_id}
-                      title="Exporter en PDF"
-                    >
-                      <FileDown className="h-4 w-4" />
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        className="btn-secondary btn-sm"
+                        onClick={() => handleExportPdf(row.eleve_id, 'print')}
+                        disabled={exporting === row.eleve_id}
+                        title="Imprimer"
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        className="btn-secondary btn-sm"
+                        onClick={() => handleExportPdf(row.eleve_id, 'save')}
+                        disabled={exporting === row.eleve_id}
+                        title="Enregistrer PDF"
+                      >
+                        <FileDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

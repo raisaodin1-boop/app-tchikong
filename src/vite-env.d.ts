@@ -33,8 +33,10 @@ interface TchikongApi {
   genererBulletins: (classeId: number, periodeId: number, appreciations: Record<number, string> | undefined, token: string) => Promise<unknown[]>
   getBulletinData: (eleveId: number, periodeId: number) => Promise<unknown>
   listBulletinsClasse: (classeId: number, periodeId: number) => Promise<unknown[]>
-  exportBulletinPdf: (eleveId: number, periodeId: number) => Promise<{ success: boolean; path?: string; error?: string }>
-  exportPalmaresPdf: (classeId: number, periodeId: number, classeNom?: string, anneeLibelle?: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  exportBulletinPdf: (eleveId: number, periodeId: number, action?: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  exportPalmaresPdf: (classeId: number, periodeId: number, classeNom?: string, anneeLibelle?: string, action?: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  genererDocument: (type: string, eleveId: number, anneeId: number | undefined, action: string, token: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  exportListeClassePdf: (classeId: number, action?: string) => Promise<{ success: boolean; path?: string; error?: string }>
 }
 
 declare global {

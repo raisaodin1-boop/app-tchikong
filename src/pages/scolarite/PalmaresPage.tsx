@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileDown, Trophy } from 'lucide-react'
+import { FileDown, Trophy, Printer } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import type { EleveMoyenne, PeriodeEvaluation } from '@shared/types'
 
@@ -26,6 +26,7 @@ export default function PalmaresPage() {
   const [periodes, setPeriodes] = useState<PeriodeEvaluation[]>([])
   const [palmares, setPalmares] = useState<EleveMoyenne[]>([])
   const [exporting, setExporting] = useState(false)
+  const [printing, setPrinting] = useState(false)
 
   useEffect(() => {
     if (classes.length > 0 && !classeId) setClasseId(classes[0].id)
@@ -47,16 +48,24 @@ export default function PalmaresPage() {
 
   const selectedClasse = classes.find((c) => c.id === classeId)
 
-  const handleExport = async () => {
-    setExporting(true)
+  const handleExport = async (action: 'save' | 'print') => {
+    if (action === 'save') setExporting(true)
+    else setPrinting(true)
+
     const result = await window.api.exportPalmaresPdf(
       classeId,
       periodeId,
       selectedClasse?.nom,
-      anneeActive?.libelle
+      anneeActive?.libelle,
+      action
     )
-    if (result.success) alert(`Palmarès enregistré : ${result.path}`)
+    if (result.success && action === 'save' && result.path) {
+      alert(`Palmarès enregistré : ${result.path}`)
+    } else if (result.error) {
+      alert(result.error)
+    }
     setExporting(false)
+    setPrinting(false)
   }
 
   const moyenneClasse =
@@ -118,14 +127,22 @@ export default function PalmaresPage() {
         </div>
       )}
 
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end gap-2 mb-4">
+        <button
+          className="btn-secondary btn-sm"
+          onClick={() => handleExport('print')}
+          disabled={printing || palmares.length === 0}
+        >
+          <Printer className="h-4 w-4" />
+          {printing ? 'Impression...' : 'Imprimer'}
+        </button>
         <button
           className="btn-primary btn-sm"
-          onClick={handleExport}
+          onClick={() => handleExport('save')}
           disabled={exporting || palmares.length === 0}
         >
           <FileDown className="h-4 w-4" />
-          {exporting ? 'Export...' : 'Exporter le palmarès (PDF)'}
+          {exporting ? 'Export...' : 'Enregistrer PDF'}
         </button>
       </div>
 

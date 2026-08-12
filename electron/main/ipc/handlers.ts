@@ -1,13 +1,15 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '../../../shared/types'
 import * as authService from '../services/auth'
 import * as referentielService from '../services/referentiel'
 import * as elevesService from '../services/eleves'
 import * as dashboardService from '../services/dashboard'
 import * as scolariteService from '../services/scolarite'
-import { generateBulletinPdf, generatePalmaresPdf } from '../services/pdf-bulletin'
+import * as documentsService from '../services/documents'
+import { handlePdfAction, handlePdfPrint } from '../services/pdf-handler'
 import { backupDatabase, restoreDatabase, getDbPath } from '../../../db/database'
 import { seedDemoData, seedReferenceData } from '../../../db/seed'
+import { dialog } from 'electron'
 
 export function registerIpcHandlers(): void {
   // Auth
@@ -143,45 +145,96 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.BULLETIN_LIST, (_, classeId, periodeId) =>
     scolariteService.listBulletinsClasse(classeId, periodeId)
   )
-  ipcMain.handle(IPC_CHANNELS.BULLETIN_PDF, async (_, eleveId, periodeId) => {
-    const data = scolariteService.getBulletinData(eleveId, periodeId)
-    if (!data) return { success: false, error: 'Bulletin introuvable' }
 
-    const pdfBytes = await generateBulletinPdf(data)
-    const result = await dialog.showSaveDialog({
-      title: 'Enregistrer le bulletin',
-      defaultPath: `bulletin-${data.eleve.matricule}-${data.periode.libelle.replace(/\s/g, '-')}.pdf`,
-      filters: [{ name: 'PDF', extensions: ['pdf'] }]
-    })
-    if (!result.canceled && result.filePath) {
-      writeFileSync(result.filePath, pdfBytes)
-      return { success: true, path: result.filePath }
-    }
-    return { success: false }
+  // --- PDF : bulletins & palmarès ---
+  ipcMain.handle(IPC_CHANNELS.BULLETIN_PDF, async (_, eleveId, periodeId, action = 'save') => {
+    const data = scolariteService.getBulletinData(eleveId, periodeId)
+    if (!data) return { success: false, error: 'Bulletin introuvable — saisissez les notes d\'abord' }
+    return handlePdfAction(
+      { type: 'bulletin', data },
+      action as 'save' | 'print',
+      data.eleve.matricule,
+      'Bulletin de notes'
+    )
   })
+
   ipcMain.handle(
     IPC_CHANNELS.PALMARES_PDF,
-    async (_, classeId, periodeId, classeNom, anneeLibelle) => {
+    async (_, classeId, periodeId, classeNom, anneeLibelle, action = 'save') => {
       const grid = scolariteService.getNotesGrid(classeId, periodeId)
       if (!grid) return { success: false, error: 'Classe introuvable' }
 
       const palmares = scolariteService.getPalmares(classeId, periodeId)
-      const pdfBytes = await generatePalmaresPdf(
-        classeNom || grid.classe.nom,
-        grid.periode,
-        anneeLibelle || '',
-        palmares
+      return handlePdfAction(
+        {
+          type: 'palmares',
+          data: {
+            classeNom: classeNom || grid.classe.nom,
+            periode: grid.periode,
+            anneeLibelle: anneeLibelle || '',
+            palmares
+          }
+        },
+        action as 'save' | 'print',
+        grid.classe.nom,
+        'Palmarès de classe'
       )
-      const result = await dialog.showSaveDialog({
-        title: 'Enregistrer le palmarès',
-        defaultPath: `palmares-${grid.classe.nom}-${grid.periode.libelle.replace(/\s/g, '-')}.pdf`,
-        filters: [{ name: 'PDF', extensions: ['pdf'] }]
-      })
-      if (!result.canceled && result.filePath) {
-        writeFileSync(result.filePath, pdfBytes)
-        return { success: true, path: result.filePath }
-      }
-      return { success: false }
     }
   )
+
+  // --- PDF : attestations & documents officiels ---
+  ipcMain.handle(
+    IPC_CHANNELS.DOCUMENT_GENERER,
+    async (_, type, eleveId, anneeId, action = 'save', token) => {
+      const data = documentsService.getAttestationData(eleveId, anneeId)
+      if (!data) return { success: false, error: 'Données élève introuvables' }
+
+      const validTypes = [
+        'attestation_scolarite',
+        'certificat_frequentation',
+        'attestation_reussite'
+      ] as const
+
+      if (!validTypes.includes(type)) {
+        return { success: false, error: 'Type de document invalide' }
+      }
+
+      const userId = authService.getCurrentUserId(token)
+      const result = await handlePdfAction(
+        { type, data },
+        action as 'save' | 'print',
+        data.eleve.matricule,
+        type.replace(/_/g, ' ')
+      )
+
+      if (result.success && result.path) {
+        documentsService.enregistrerDocumentOfficiel(
+          eleveId,
+          type,
+          result.path.split('/').pop() || type,
+          JSON.stringify(data),
+          userId ?? undefined
+        )
+      }
+
+      return result
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.LISTE_CLASSE_PDF, async (_, classeId, action = 'save') => {
+    const data = documentsService.getListeClasseData(classeId)
+    if (!data) return { success: false, error: 'Classe introuvable' }
+
+    return handlePdfAction(
+      { type: 'liste_classe', data },
+      action as 'save' | 'print',
+      data.classe_nom,
+      'Liste de classe'
+    )
+  })
+
+  // Impression rapide (sans dialogue sauf print dialog système)
+  ipcMain.handle(IPC_CHANNELS.PDF_PRINT, async (_, payload) => {
+    return handlePdfPrint(payload)
+  })
 }

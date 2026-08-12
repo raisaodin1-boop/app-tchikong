@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, Filter, Printer } from 'lucide-react'
+import { Plus, Search, Filter, Printer, FileDown } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import type { Inscription, StatutEleve } from '@shared/types'
 
@@ -28,6 +28,22 @@ export default function ElevesPage() {
   const [filtreClasse, setFiltreClasse] = useState<number | ''>('')
   const [filtreStatut, setFiltreStatut] = useState<StatutEleve | ''>('actif')
   const [showFilters, setShowFilters] = useState(false)
+  const [listPrinting, setListPrinting] = useState(false)
+
+  const handlePrintListe = async (action: 'save' | 'print') => {
+    if (!filtreClasse) {
+      alert('Sélectionnez une classe dans les filtres pour imprimer la liste')
+      return
+    }
+    setListPrinting(true)
+    const result = await window.api.exportListeClassePdf(filtreClasse, action)
+    if (result.success && action === 'save' && result.path) {
+      alert(`Liste enregistrée : ${result.path}`)
+    } else if (result.error) {
+      alert(result.error)
+    }
+    setListPrinting(false)
+  }
 
   const loadEleves = async () => {
     setLoading(true)
@@ -61,9 +77,23 @@ export default function ElevesPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="btn-secondary btn-sm">
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => handlePrintListe('print')}
+            disabled={listPrinting || !filtreClasse}
+            title="Imprimer la liste de classe"
+          >
             <Printer className="h-4 w-4" />
-            Imprimer liste
+            Imprimer
+          </button>
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => handlePrintListe('save')}
+            disabled={listPrinting || !filtreClasse}
+            title="Exporter la liste en PDF"
+          >
+            <FileDown className="h-4 w-4" />
+            Liste PDF
           </button>
           <Link to="/eleves/nouveau" className="btn-primary btn-sm">
             <Plus className="h-4 w-4" />

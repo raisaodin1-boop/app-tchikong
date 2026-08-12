@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Phone, MapPin, Calendar, User } from 'lucide-react'
+import { ArrowLeft, Edit, Phone, MapPin, Calendar, User, FileText, Printer } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type { Eleve, Inscription, ParentTuteur, HistoriqueEleve } from '@shared/types'
 
 const lienLabels: Record<string, string> = {
@@ -23,12 +24,35 @@ const historiqueLabels: Record<string, string> = {
 export default function EleveDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { anneeActive } = useApp()
+  const { token } = useAuth()
   const navigate = useNavigate()
   const [eleve, setEleve] = useState<Eleve | null>(null)
   const [inscription, setInscription] = useState<Inscription | null>(null)
   const [parents, setParents] = useState<ParentTuteur[]>([])
   const [historique, setHistorique] = useState<HistoriqueEleve[]>([])
   const [loading, setLoading] = useState(true)
+  const [docLoading, setDocLoading] = useState<string | null>(null)
+
+  const genererDocument = async (
+    type: 'attestation_scolarite' | 'certificat_frequentation' | 'attestation_reussite',
+    action: 'save' | 'print'
+  ) => {
+    if (!id || !token) return
+    setDocLoading(`${type}-${action}`)
+    const result = await window.api.genererDocument(
+      type,
+      Number(id),
+      anneeActive?.id,
+      action,
+      token
+    )
+    if (result.success && action === 'save' && result.path) {
+      alert(`Document enregistré : ${result.path}`)
+    } else if (result.error) {
+      alert(result.error)
+    }
+    setDocLoading(null)
+  }
 
   useEffect(() => {
     if (!id) return
@@ -199,11 +223,37 @@ export default function EleveDetailPage() {
 
         <div className="space-y-4">
           <div className="card p-5">
-            <h3 className="text-sm font-semibold text-gray-500 mb-3">Actions</h3>
+            <h3 className="text-sm font-semibold text-gray-500 mb-3">Documents officiels</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Génération hors-ligne, directement imprimable (format A4)
+            </p>
             <div className="space-y-2">
-              <button className="btn-secondary w-full text-sm">Imprimer fiche</button>
-              <button className="btn-secondary w-full text-sm">Attestation de scolarité</button>
-              <button className="btn-secondary w-full text-sm">Historique des paiements</button>
+              {(
+                [
+                  { type: 'attestation_scolarite' as const, label: 'Attestation de scolarité' },
+                  { type: 'certificat_frequentation' as const, label: 'Certificat de fréquentation' },
+                  { type: 'attestation_reussite' as const, label: 'Attestation de réussite' }
+                ] as const
+              ).map((doc) => (
+                <div key={doc.type} className="flex gap-1">
+                  <button
+                    className="btn-secondary btn-sm flex-1 text-xs justify-start"
+                    onClick={() => genererDocument(doc.type, 'print')}
+                    disabled={docLoading !== null}
+                  >
+                    <Printer className="h-3.5 w-3.5 flex-shrink-0" />
+                    {docLoading === `${doc.type}-print` ? '...' : doc.label}
+                  </button>
+                  <button
+                    className="btn-secondary btn-sm px-2"
+                    onClick={() => genererDocument(doc.type, 'save')}
+                    disabled={docLoading !== null}
+                    title="Enregistrer en PDF"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>

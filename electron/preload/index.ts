@@ -117,16 +117,40 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.BULLETIN_LIST, classeId, periodeId),
   exportBulletinPdf: (
     eleveId: number,
-    periodeId: number
-  ): Promise<{ success: boolean; path?: string; error?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.BULLETIN_PDF, eleveId, periodeId),
+    periodeId: number,
+    action?: 'save' | 'print'
+  ): Promise<{ success: boolean; path?: string; error?: string; printed?: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BULLETIN_PDF, eleveId, periodeId, action ?? 'save'),
   exportPalmaresPdf: (
     classeId: number,
     periodeId: number,
     classeNom?: string,
-    anneeLibelle?: string
+    anneeLibelle?: string,
+    action?: 'save' | 'print'
+  ): Promise<{ success: boolean; path?: string; error?: string; printed?: boolean }> =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.PALMARES_PDF,
+      classeId,
+      periodeId,
+      classeNom,
+      anneeLibelle,
+      action ?? 'save'
+    ),
+
+  // Documents officiels
+  genererDocument: (
+    type: 'attestation_scolarite' | 'certificat_frequentation' | 'attestation_reussite',
+    eleveId: number,
+    anneeId: number | undefined,
+    action: 'save' | 'print',
+    token: string
+  ): Promise<{ success: boolean; path?: string; error?: string; printed?: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DOCUMENT_GENERER, type, eleveId, anneeId, action, token),
+  exportListeClassePdf: (
+    classeId: number,
+    action?: 'save' | 'print'
   ): Promise<{ success: boolean; path?: string; error?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.PALMARES_PDF, classeId, periodeId, classeNom, anneeLibelle)
+    ipcRenderer.invoke(IPC_CHANNELS.LISTE_CLASSE_PDF, classeId, action ?? 'save')
 }
 
 contextBridge.exposeInMainWorld('api', api)

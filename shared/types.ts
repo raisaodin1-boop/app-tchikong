@@ -559,5 +559,10 @@ export const IPC_CHANNELS = {
   BULLETIN_DATA: 'scolarite:bulletinData',
   BULLETIN_LIST: 'scolarite:bulletinList',
   BULLETIN_PDF: 'scolarite:bulletinPdf',
-  PALMARES_PDF: 'scolarite:palmaresPdf'
+  PALMARES_PDF: 'scolarite:palmaresPdf',
+
+  // Documents PDF
+  DOCUMENT_GENERER: 'document:generer',
+  LISTE_CLASSE_PDF: 'document:listeClasse',
+  PDF_PRINT: 'pdf:print'
 } as const
