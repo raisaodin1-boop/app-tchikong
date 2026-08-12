@@ -98,8 +98,9 @@ export function seedDemoData(): { message: string; count: number } {
   const existing = db.prepare('SELECT COUNT(*) as c FROM eleves').get() as { c: number }
   if (existing.c >= 50) {
     const notesResult = seedNotesDemo()
+    const paymentsResult = seedPaymentsDemo()
     return {
-      message: `Données déjà présentes (${existing.c} élèves). ${notesResult.message}`,
+      message: `Données déjà présentes (${existing.c} élèves). ${notesResult.message}. ${paymentsResult.message}`,
       count: existing.c
     }
   }
@@ -258,9 +259,14 @@ export function seedDemoData(): { message: string; count: number } {
   for (const n of niveaux) {
     const montant = n.cycle === 'maternelle' ? 75000 : n.section_id === 2 ? 95000 : 85000
     insertTarif.run(anneeId, n.id, n.section_id, montant)
+    db.prepare(
+      `INSERT OR IGNORE INTO grille_tarifaire (annee_scolaire_id, niveau_id, section_id, type_frais, libelle, montant)
+       VALUES (?, ?, ?, 'inscription', 'Frais d''inscription', ?)`
+    ).run(anneeId, n.id, n.section_id, n.cycle === 'maternelle' ? 15000 : 20000)
   }
 
   seedNotesDemo(anneeId)
+  seedPaymentsDemo(anneeId)
 
   return { message: `${count} élèves de démonstration créés`, count }
 }
@@ -328,4 +334,80 @@ export function seedNotesDemo(anneeId?: number): { message: string; notesCount: 
   }
 
   return { message: `${notesCount} notes de démonstration créées`, notesCount }
+}
+
+export function seedPaymentsDemo(anneeId?: number): { message: string; count: number } {
+  const db = getDb()
+
+  const existing = (db.prepare('SELECT COUNT(*) as c FROM paiements').get() as { c: number }).c
+  if (existing > 0) {
+    return { message: 'Paiements de démonstration déjà présents', count: existing }
+  }
+
+  let yearId = anneeId
+  if (!yearId) {
+    const annee = db.prepare('SELECT id FROM annees_scolaires WHERE active = 1').get() as
+      | { id: number }
+      | undefined
+    yearId = annee?.id
+  }
+  if (!yearId) return { message: 'Aucune année scolaire active', count: 0 }
+
+  const eleves = db
+    .prepare(
+      `SELECT i.eleve_id FROM inscriptions i WHERE i.annee_scolaire_id = ? AND i.statut = 'actif'`
+    )
+    .all(yearId) as { eleve_id: number }[]
+
+  const insertPaiement = db.prepare(
+    `INSERT INTO paiements (eleve_id, annee_scolaire_id, type_frais, montant, mode_paiement, numero_recu, date_paiement)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  )
+
+  const modes = ['especes', 'mobile_money', 'cheque', 'virement'] as const
+  let count = 0
+  let recuNum = 1
+
+  for (const el of eleves) {
+    // ~60% ont payé au moins l'inscription, ~40% ont payé la scolarité partiellement ou totalement
+    const rand = Math.random()
+    const year = 2025
+
+    if (rand > 0.15) {
+      // Inscription payée
+      insertPaiement.run(
+        el.eleve_id, yearId, 'inscription', 20000,
+        modes[recuNum % 4], `REC-${year}-${String(recuNum++).padStart(5, '0')}`,
+        '2025-09-15'
+      )
+      count++
+    }
+
+    if (rand > 0.4) {
+      // Scolarité partielle ou totale
+      const montant = rand > 0.7 ? 85000 : rand > 0.55 ? 50000 : 30000
+      insertPaiement.run(
+        el.eleve_id, yearId, 'scolarite', montant,
+        modes[recuNum % 4], `REC-${year}-${String(recuNum++).padStart(5, '0')}`,
+        rand > 0.6 ? '2025-10-01' : '2025-11-15'
+      )
+      count++
+    }
+  }
+
+  // Quelques dépenses
+  const depenses = [
+    { type: 'salaire', libelle: 'Salaires enseignants - Octobre', montant: 450000, beneficiaire: 'Personnel' },
+    { type: 'fourniture', libelle: 'Achat de craies et marqueurs', montant: 35000, beneficiaire: 'Papeterie Douala' },
+    { type: 'charge', libelle: 'Facture électricité', montant: 28000, beneficiaire: 'ENEO' }
+  ]
+  const insertDepense = db.prepare(
+    `INSERT INTO depenses (annee_scolaire_id, type, libelle, montant, date_depense, beneficiaire)
+     VALUES (?, ?, ?, ?, date('now', '-' || ? || ' days'), ?)`
+  )
+  depenses.forEach((d, i) => {
+    insertDepense.run(yearId, d.type, d.libelle, d.montant, i * 15, d.beneficiaire)
+  })
+
+  return { message: `${count} paiements de démonstration créés`, count }
 }

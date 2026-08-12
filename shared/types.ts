@@ -448,6 +448,73 @@ export interface BulletinData {
   bulletin: Bulletin | null
 }
 
+// --- Finances ---
+
+export interface SituationFinanciere {
+  eleve_id: number
+  nom: string
+  prenom: string
+  matricule: string
+  classe_nom: string
+  section_code: string
+  total_du: number
+  total_paye: number
+  reste: number
+  statut: 'a_jour' | 'partiel' | 'impaye'
+  details: {
+    type_frais: TypeFrais
+    libelle: string
+    montant_du: number
+    montant_paye: number
+    reste: number
+  }[]
+}
+
+export interface ImpayeEleve {
+  eleve_id: number
+  nom: string
+  prenom: string
+  matricule: string
+  classe_nom: string
+  section_code: string
+  telephone: string | null
+  total_du: number
+  total_paye: number
+  reste: number
+}
+
+export interface FinancesDashboard {
+  recettes_mois: number
+  recettes_annee: number
+  depenses_annee: number
+  solde: number
+  taux_recouvrement: number
+  eleves_a_jour: number
+  eleves_impayes: number
+  montant_impayes: number
+  paiements_recents: (Paiement & { nom: string; prenom: string; matricule: string })[]
+  recettes_par_section: { section: string; montant: number }[]
+}
+
+export interface PaiementFormData {
+  eleve_id: number
+  annee_scolaire_id: number
+  type_frais: TypeFrais
+  montant: number
+  mode_paiement: ModePaiement
+  date_paiement?: string
+  notes?: string
+}
+
+export interface PaiementFiltres {
+  annee_scolaire_id?: number
+  eleve_id?: number
+  type_frais?: TypeFrais
+  date_debut?: string
+  date_fin?: string
+  recherche?: string
+}
+
 // --- Dashboard ---
 
 export interface DashboardStats {
@@ -564,5 +631,17 @@ export const IPC_CHANNELS = {
   // Documents PDF
   DOCUMENT_GENERER: 'document:generer',
   LISTE_CLASSE_PDF: 'document:listeClasse',
-  PDF_PRINT: 'pdf:print'
+  PDF_PRINT: 'pdf:print',
+
+  // Finances
+  FINANCES_DASHBOARD: 'finances:dashboard',
+  FINANCES_SITUATION: 'finances:situation',
+  FINANCES_GRILLE: 'finances:grille',
+  FINANCES_PAIEMENT_CREATE: 'finances:paiementCreate',
+  FINANCES_PAIEMENT_LIST: 'finances:paiementList',
+  FINANCES_IMPAYES: 'finances:impayes',
+  FINANCES_RECU_PDF: 'finances:recuPdf',
+  FINANCES_IMPAYES_PDF: 'finances:impayesPdf',
+  FINANCES_DEPENSE_LIST: 'finances:depenseList',
+  FINANCES_DEPENSE_CREATE: 'finances:depenseCreate'
 } as const

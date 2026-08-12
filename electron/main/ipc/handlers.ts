@@ -6,6 +6,7 @@ import * as elevesService from '../services/eleves'
 import * as dashboardService from '../services/dashboard'
 import * as scolariteService from '../services/scolarite'
 import * as documentsService from '../services/documents'
+import * as financesService from '../services/finances'
 import { handlePdfAction, handlePdfPrint } from '../services/pdf-handler'
 import { backupDatabase, restoreDatabase, getDbPath } from '../../../db/database'
 import { seedDemoData, seedReferenceData } from '../../../db/seed'
@@ -236,5 +237,52 @@ export function registerIpcHandlers(): void {
   // Impression rapide (sans dialogue sauf print dialog système)
   ipcMain.handle(IPC_CHANNELS.PDF_PRINT, async (_, payload) => {
     return handlePdfPrint(payload)
+  })
+
+  // --- Finances ---
+  ipcMain.handle(IPC_CHANNELS.FINANCES_DASHBOARD, (_, anneeId) =>
+    financesService.getFinancesDashboard(anneeId)
+  )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_SITUATION, (_, eleveId, anneeId) =>
+    financesService.getSituationFinanciere(eleveId, anneeId)
+  )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE, (_, anneeId) =>
+    financesService.listGrilleTarifaire(anneeId)
+  )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, (_, data, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return financesService.createPaiement(data, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_LIST, (_, filtres) =>
+    financesService.listPaiements(filtres)
+  )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_IMPAYES, (_, anneeId, classeId) =>
+    financesService.listImpayes(anneeId, classeId)
+  )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_DEPENSE_LIST, (_, anneeId) =>
+    financesService.listDepenses(anneeId)
+  )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_DEPENSE_CREATE, (_, data, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return financesService.createDepense(data, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.FINANCES_RECU_PDF, async (_, paiementId, action = 'save') => {
+    const data = financesService.getRecuData(paiementId)
+    if (!data) return { success: false, error: 'Paiement introuvable' }
+    return handlePdfAction(
+      { type: 'recu_paiement', data },
+      action as 'save' | 'print',
+      data.paiement.numero_recu,
+      'Reçu de paiement'
+    )
+  })
+  ipcMain.handle(IPC_CHANNELS.FINANCES_IMPAYES_PDF, async (_, anneeId, anneeLibelle, action = 'save') => {
+    const impayes = financesService.listImpayes(anneeId)
+    return handlePdfAction(
+      { type: 'liste_impayes', data: { anneeLibelle: anneeLibelle || '', impayes } },
+      action as 'save' | 'print',
+      anneeLibelle || 'impayes',
+      'Liste des impayés'
+    )
   })
 }

@@ -150,7 +150,29 @@ const api = {
     classeId: number,
     action?: 'save' | 'print'
   ): Promise<{ success: boolean; path?: string; error?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.LISTE_CLASSE_PDF, classeId, action ?? 'save')
+    ipcRenderer.invoke(IPC_CHANNELS.LISTE_CLASSE_PDF, classeId, action ?? 'save'),
+
+  // Finances
+  getFinancesDashboard: (anneeId: number): Promise<import('../../shared/types').FinancesDashboard> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DASHBOARD, anneeId),
+  getSituationFinanciere: (eleveId: number, anneeId: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_SITUATION, eleveId, anneeId),
+  listGrilleTarifaire: (anneeId: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE, anneeId),
+  createPaiement: (data: import('../../shared/types').PaiementFormData, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, data, token),
+  listPaiements: (filtres?: import('../../shared/types').PaiementFiltres) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_LIST, filtres),
+  listImpayes: (anneeId: number, classeId?: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES, anneeId, classeId),
+  listDepenses: (anneeId: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DEPENSE_LIST, anneeId),
+  createDepense: (data: object, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DEPENSE_CREATE, data, token),
+  exportRecuPdf: (paiementId: number, action?: 'save' | 'print') =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_RECU_PDF, paiementId, action ?? 'save'),
+  exportImpayesPdf: (anneeId: number, anneeLibelle: string, action?: 'save' | 'print') =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES_PDF, anneeId, anneeLibelle, action ?? 'save')
 }
 
 contextBridge.exposeInMainWorld('api', api)

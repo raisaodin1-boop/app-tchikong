@@ -11,7 +11,12 @@ import ScolaritePage from './pages/scolarite/ScolaritePage'
 import NotesSaisiePage from './pages/scolarite/NotesSaisiePage'
 import BulletinsPage from './pages/scolarite/BulletinsPage'
 import PalmaresPage from './pages/scolarite/PalmaresPage'
-import FinancesPage from './pages/FinancesPage'
+import FinancesPage from './pages/finances/FinancesPage'
+import FinancesDashboardPage from './pages/finances/FinancesDashboardPage'
+import PaiementPage from './pages/finances/PaiementPage'
+import HistoriquePage from './pages/finances/HistoriquePage'
+import ImpayesPage from './pages/finances/ImpayesPage'
+import DepensesPage from './pages/finances/DepensesPage'
 import AdminPage from './pages/AdminPage'
 import LoadingScreen from './components/ui/LoadingScreen'
 
@@ -53,7 +58,13 @@ export default function App() {
           <Route path="bulletins" element={<BulletinsPage />} />
           <Route path="palmares" element={<PalmaresPage />} />
         </Route>
-        <Route path="finances" element={<FinancesPage />} />
+        <Route path="finances" element={<FinancesPage />}>
+          <Route index element={<FinancesDashboardPage />} />
+          <Route path="paiement" element={<PaiementPage />} />
+          <Route path="historique" element={<HistoriquePage />} />
+          <Route path="impayes" element={<ImpayesPage />} />
+          <Route path="depenses" element={<DepensesPage />} />
+        </Route>
         <Route path="admin" element={<AdminPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

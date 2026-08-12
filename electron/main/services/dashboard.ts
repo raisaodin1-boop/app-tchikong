@@ -1,3 +1,4 @@
+import * as financesService from '../services/finances'
 import { getDb } from '../../../db/database'
 import type { DashboardStats, RechercheResultat } from '../../../shared/types'
 
@@ -64,7 +65,34 @@ export function getDashboardStats(anneeScolaireId?: number): DashboardStats {
 
   const alertes: DashboardStats['alertes'] = []
 
+  let financesData = {
+    recettes_mois: recettesMois,
+    recettes_annee: recettesAnnee,
+    taux_recouvrement: 0,
+    impayes_count: 0,
+    montant_impayes: 0
+  }
+
   if (anneeId) {
+    try {
+      const fd = financesService.getFinancesDashboard(anneeId)
+      financesData = {
+        recettes_mois: fd.recettes_mois,
+        recettes_annee: fd.recettes_annee,
+        taux_recouvrement: fd.taux_recouvrement,
+        impayes_count: fd.eleves_impayes,
+        montant_impayes: fd.montant_impayes
+      }
+      if (fd.eleves_impayes > 0) {
+        alertes.push({
+          type: 'impaye',
+          message: `${fd.eleves_impayes} élève(s) en situation d'impayé`,
+          count: fd.eleves_impayes
+        })
+      }
+    } catch {
+      // finances pas encore initialisées
+    }
     const classesSurchargees = db
       .prepare(
         `SELECT c.nom, c.capacite_max,
@@ -89,13 +117,7 @@ export function getDashboardStats(anneeScolaireId?: number): DashboardStats {
       par_section: parSection,
       par_niveau: parNiveau
     },
-    finances: {
-      recettes_mois: recettesMois,
-      recettes_annee: recettesAnnee,
-      taux_recouvrement: 0,
-      impayes_count: 0,
-      montant_impayes: 0
-    },
+    finances: financesData,
     alertes
   }
 }
