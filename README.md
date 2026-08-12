@@ -19,14 +19,48 @@ Application desktop de gestion scolaire pour le **Groupe Scolaire Bilingue Prima
 | Scolarité (notes, moyennes, bulletins PDF, palmarès) | ✅ |
 | Documents PDF (attestations, certificats, listes) | ✅ |
 | Finances (paiements, reçus PDF, impayés, dépenses) | ✅ |
-| Administratif (personnel, documents) | 🔜 |
+| Administratif (personnel, classes, utilisateurs, documents) | ✅ |
 
-## Installation
+## ⚠️ Important : ce n'est PAS un site web
+
+Cette application est une **application de bureau Windows** (Electron).  
+**Vercel ne peut pas l'héberger.** Elle s'installe et tourne sur votre PC.
+
+---
+
+## Installation Windows (méthode simple)
+
+### Méthode A — Double-clic (recommandée)
+
+1. Téléchargez le projet : [branche cursor/tchikong-school-app-bbfb](https://github.com/raisaodin1-boop/app-tchikong/tree/cursor/tchikong-school-app-bbfb)  
+   → bouton vert **Code** → **Download ZIP** → dézippez dans `C:\Users\VotreNom\app-tchikong`
+2. Installez **Node.js 22 LTS** : https://nodejs.org (pas la version 24)
+3. **Double-cliquez** sur `INSTALLER.bat` (attendez la fin)
+4. **Double-cliquez** sur `LANCER.bat`
+
+### Méthode B — Télécharger l'installateur (.exe) sans Node.js
+
+1. Allez sur GitHub → onglet **Actions**
+2. Cliquez sur **Build Windows** (dernière exécution verte ✓)
+3. En bas, section **Artifacts** → téléchargez **TCHIKONG-Windows-Installer**
+4. Extrayez le ZIP et lancez le fichier `.exe`
+
+### Méthode C — Ligne de commande
 
 ```bash
+git clone -b cursor/tchikong-school-app-bbfb https://github.com/raisaodin1-boop/app-tchikong.git
+cd app-tchikong
 npm install
 npm run dev
 ```
+
+### Si `npm install` échoue (erreur better-sqlite3)
+
+Installez **Build Tools for Visual Studio 2022** avec « Développement Desktop en C++ » :  
+https://visualstudio.microsoft.com/visual-cpp-build-tools/  
+Puis redémarrez le PC et relancez `INSTALLER.bat`.
+
+Ou utilisez la **Méthode B** (installateur pré-compilé sur GitHub Actions).
 
 ## Comptes de démonstration
 

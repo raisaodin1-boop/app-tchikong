@@ -5,6 +5,9 @@
   "main": "out/main/index.js",
   "author": "Groupe Scolaire TCHIKONG",
   "license": "MIT",
+  "engines": {
+    "node": ">=20 <=22"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",

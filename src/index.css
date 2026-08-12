@@ -24,6 +24,9 @@
   .btn-sm {
     @apply px-3 py-1.5 text-xs;
   }
+  .btn-icon {
+    @apply inline-flex items-center justify-center rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors;
+  }
   .input {
     @apply block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-tchikong-500 focus:outline-none focus:ring-1 focus:ring-tchikong-500;
   }
