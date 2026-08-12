@@ -40,10 +40,14 @@ Cette application est une **application de bureau Windows** (Electron).
 
 ### Méthode B — Télécharger l'installateur (.exe) sans Node.js
 
-1. Allez sur GitHub → onglet **Actions**
-2. Cliquez sur **Build Windows** (dernière exécution verte ✓)
-3. En bas, section **Artifacts** → téléchargez **TCHIKONG-Windows-Installer**
-4. Extrayez le ZIP et lancez le fichier `.exe`
+1. Allez sur GitHub → onglet **Actions** : https://github.com/raisaodin1-boop/app-tchikong/actions
+2. Cliquez sur **Build Windows** dans la liste de gauche
+3. Cliquez sur la **dernière ligne avec ✓ vert** (pas une croix rouge)
+4. Descendez tout en bas de la page → section **Artifacts**
+5. Téléchargez **TCHIKONG-Windows-Installer**
+6. Extrayez le ZIP et lancez `TCHIKONG Gestion Scolaire Setup 1.0.0.exe`
+
+> **Pas d'Artifacts ?** = le build a échoué (croix rouge). Attendez un build vert ou utilisez la Méthode A.
 
 ### Méthode C — Ligne de commande
 
