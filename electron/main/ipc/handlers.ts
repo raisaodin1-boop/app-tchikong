@@ -57,6 +57,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ANNEE_LIST, () => referentielService.listAnnees())
   ipcMain.handle(IPC_CHANNELS.ANNEE_GET_ACTIVE, () => referentielService.getActiveAnnee())
   ipcMain.handle(IPC_CHANNELS.ANNEE_CREATE, (_, data) => referentielService.createAnnee(data))
+  ipcMain.handle(IPC_CHANNELS.ANNEE_START, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return referentielService.startNewAnnee(data, session.utilisateur.id)
+  })
   ipcMain.handle(IPC_CHANNELS.CLASSE_LIST, (_, anneeId) =>
     referentielService.listClasses(anneeId)
   )
@@ -252,21 +259,21 @@ export function registerIpcHandlers(): void {
     financesService.getSituationFinanciere(eleveId, anneeId)
   )
   ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE, (_, anneeId) =>
-    financesService.listGrilleTarifaire(anneeId)
+    financesService.listFraisConfigurations(anneeId)
   )
   ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE_UPSERT, (_, data, token) => {
     const session = authService.getSession(token)
     if (!session || session.utilisateur.role !== 'directrice') {
       throw new Error('Accès réservé à la directrice')
     }
-    return financesService.upsertTarif(data, session.utilisateur.id)
+    return financesService.upsertFraisConfiguration(data, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE_DELETE, (_, id, token) => {
     const session = authService.getSession(token)
     if (!session || session.utilisateur.role !== 'directrice') {
       throw new Error('Accès réservé à la directrice')
     }
-    return financesService.deleteTarif(id, session.utilisateur.id)
+    return financesService.deleteFraisConfiguration(id, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, (_, data, token) => {
     const userId = authService.getCurrentUserId(token)

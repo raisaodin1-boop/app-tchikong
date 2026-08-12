@@ -57,6 +57,7 @@ export type TypeFrais =
   | 'autre'
 
 export type ModePaiement = 'especes' | 'cheque' | 'virement' | 'mobile_money'
+export type ModeTarification = 'unique' | 'par_classe'
 
 export type TypeDepense =
   | 'salaire'
@@ -333,6 +334,7 @@ export interface Paiement {
   date_paiement: string
   notes: string | null
   created_by: number | null
+  frais_modele_id: number | null
 }
 
 export interface Depense {
@@ -462,6 +464,7 @@ export interface SituationFinanciere {
   reste: number
   statut: 'a_jour' | 'partiel' | 'impaye'
   details: {
+    frais_modele_id: number
     type_frais: TypeFrais
     libelle: string
     montant_du: number
@@ -500,6 +503,7 @@ export interface PaiementFormData {
   eleve_id: number
   annee_scolaire_id: number
   type_frais: TypeFrais
+  frais_modele_id: number
   montant: number
   mode_paiement: ModePaiement
   date_paiement?: string
@@ -527,6 +531,47 @@ export interface TarifFormData {
 export interface GrilleTarifaireDetail extends GrilleTarifaire {
   niveau_nom: string
   section_code: string
+}
+
+export interface FraisMontantClasse {
+  classe_id: number
+  classe_nom: string
+  montant: number
+}
+
+export interface FraisConfiguration {
+  id: number
+  annee_scolaire_id: number
+  type_frais: TypeFrais
+  libelle: string
+  mode_tarification: ModeTarification
+  obligatoire: boolean
+  montant_unique: number | null
+  montants_par_classe: FraisMontantClasse[]
+}
+
+export interface FraisConfigurationFormData {
+  id?: number
+  annee_scolaire_id: number
+  type_frais: TypeFrais
+  libelle: string
+  mode_tarification: ModeTarification
+  obligatoire?: boolean
+  montant_unique?: number
+  montants_par_classe?: { classe_id: number; montant: number }[]
+}
+
+export interface NouvelleAnneeFormData {
+  libelle: string
+  date_debut: string
+  date_fin: string
+  nb_sequences?: number
+  nb_trimestres?: number
+}
+
+export interface NouvelleAnneeResult {
+  annee: AnneeScolaire
+  classes_copiees: number
 }
 
 export interface DemoStatus {
@@ -658,6 +703,7 @@ export const IPC_CHANNELS = {
   ANNEE_GET_ACTIVE: 'annee:getActive',
   ANNEE_CREATE: 'annee:create',
   ANNEE_SET_ACTIVE: 'annee:setActive',
+  ANNEE_START: 'annee:start',
 
   // Sections / Niveaux / Classes
   SECTION_LIST: 'section:list',

@@ -248,24 +248,50 @@ export function seedDemoData(): { message: string; count: number } {
     }
   }
 
-  // Grille tarifaire
-  const insertTarif = db.prepare(
-    `INSERT OR IGNORE INTO grille_tarifaire (annee_scolaire_id, niveau_id, section_id, type_frais, libelle, montant)
-     VALUES (?, ?, ?, 'scolarite', 'Frais de scolarité', ?)`
+  // Modules de frais : scolarité par classe et tenue à prix unique
+  const insertModele = db.prepare(
+    `INSERT OR IGNORE INTO frais_modeles
+      (annee_scolaire_id, type_frais, libelle, mode_tarification)
+     VALUES (?, ?, ?, ?)`
   )
-  const niveaux = db.prepare('SELECT id, cycle, section_id FROM niveaux').all() as {
+  insertModele.run(anneeId, 'scolarite', 'Frais de scolarité', 'par_classe')
+  insertModele.run(anneeId, 'inscription', "Frais d'inscription", 'par_classe')
+  insertModele.run(anneeId, 'uniforme', 'Tenue de sport', 'unique')
+
+  const modeles = db
+    .prepare(
+      `SELECT id, type_frais FROM frais_modeles
+       WHERE annee_scolaire_id = ? AND libelle IN (?, ?, ?)`
+    )
+    .all(anneeId, 'Frais de scolarité', "Frais d'inscription", 'Tenue de sport') as {
+    id: number
+    type_frais: string
+  }[]
+  const scolariteId = modeles.find((modele) => modele.type_frais === 'scolarite')!.id
+  const inscriptionId = modeles.find((modele) => modele.type_frais === 'inscription')!.id
+  const tenueId = modeles.find((modele) => modele.type_frais === 'uniforme')!.id
+  const insertMontant = db.prepare(
+    `INSERT OR IGNORE INTO frais_montants (frais_modele_id, classe_id, montant)
+     VALUES (?, ?, ?)`
+  )
+  const classesTarifs = db
+    .prepare(
+      `SELECT c.id, n.cycle, c.section_id
+       FROM classes c JOIN niveaux n ON n.id = c.niveau_id
+       WHERE c.annee_scolaire_id = ?`
+    )
+    .all(anneeId) as {
     id: number
     cycle: string
     section_id: number
   }[]
-  for (const n of niveaux) {
-    const montant = n.cycle === 'maternelle' ? 75000 : n.section_id === 2 ? 95000 : 85000
-    insertTarif.run(anneeId, n.id, n.section_id, montant)
-    db.prepare(
-      `INSERT OR IGNORE INTO grille_tarifaire (annee_scolaire_id, niveau_id, section_id, type_frais, libelle, montant)
-       VALUES (?, ?, ?, 'inscription', 'Frais d''inscription', ?)`
-    ).run(anneeId, n.id, n.section_id, n.cycle === 'maternelle' ? 15000 : 20000)
+  for (const classe of classesTarifs) {
+    const scolarite =
+      classe.cycle === 'maternelle' ? 75000 : classe.section_id === 2 ? 95000 : 85000
+    insertMontant.run(scolariteId, classe.id, scolarite)
+    insertMontant.run(inscriptionId, classe.id, classe.cycle === 'maternelle' ? 15000 : 20000)
   }
+  insertMontant.run(tenueId, null, 15000)
 
   seedNotesDemo(anneeId)
   seedPaymentsDemo(anneeId)
@@ -369,13 +395,17 @@ export function seedPaymentsDemo(anneeId?: number): { message: string; count: nu
 
   const eleves = db
     .prepare(
-      `SELECT i.eleve_id FROM inscriptions i WHERE i.annee_scolaire_id = ? AND i.statut = 'actif'`
+      `SELECT i.eleve_id, i.classe_id
+       FROM inscriptions i
+       WHERE i.annee_scolaire_id = ? AND i.statut = 'actif'`
     )
-    .all(yearId) as { eleve_id: number }[]
+    .all(yearId) as { eleve_id: number; classe_id: number }[]
 
   const insertPaiement = db.prepare(
-    `INSERT INTO paiements (eleve_id, annee_scolaire_id, type_frais, montant, mode_paiement, numero_recu, date_paiement)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO paiements
+      (eleve_id, annee_scolaire_id, type_frais, frais_modele_id, montant,
+       mode_paiement, numero_recu, date_paiement)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   )
 
   const modes = ['especes', 'mobile_money', 'cheque', 'virement'] as const
@@ -386,22 +416,36 @@ export function seedPaymentsDemo(anneeId?: number): { message: string; count: nu
     // ~60% ont payé au moins l'inscription, ~40% ont payé la scolarité partiellement ou totalement
     const rand = Math.random()
     const year = 2025
+    const frais = db
+      .prepare(
+        `SELECT f.id, f.type_frais
+         FROM frais_modeles f
+         JOIN frais_montants m ON m.frais_modele_id = f.id
+         WHERE f.annee_scolaire_id = ?
+           AND (
+             (f.mode_tarification = 'unique' AND m.classe_id IS NULL)
+             OR (f.mode_tarification = 'par_classe' AND m.classe_id = ?)
+           )`
+      )
+      .all(yearId, el.classe_id) as { id: number; type_frais: string }[]
+    const inscriptionId = frais.find((item) => item.type_frais === 'inscription')?.id
+    const scolariteId = frais.find((item) => item.type_frais === 'scolarite')?.id
 
-    if (rand > 0.15) {
+    if (rand > 0.15 && inscriptionId) {
       // Inscription payée
       insertPaiement.run(
-        el.eleve_id, yearId, 'inscription', 20000,
+        el.eleve_id, yearId, 'inscription', inscriptionId, 20000,
         modes[recuNum % 4], `REC-${year}-${String(recuNum++).padStart(5, '0')}`,
         '2025-09-15'
       )
       count++
     }
 
-    if (rand > 0.4) {
+    if (rand > 0.4 && scolariteId) {
       // Scolarité partielle ou totale
       const montant = rand > 0.7 ? 85000 : rand > 0.55 ? 50000 : 30000
       insertPaiement.run(
-        el.eleve_id, yearId, 'scolarite', montant,
+        el.eleve_id, yearId, 'scolarite', scolariteId, montant,
         modes[recuNum % 4], `REC-${year}-${String(recuNum++).padStart(5, '0')}`,
         rand > 0.6 ? '2025-10-01' : '2025-11-15'
       )

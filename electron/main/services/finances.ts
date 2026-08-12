@@ -1,11 +1,10 @@
 import { getDb, logActivity } from '@database'
 import type {
   Depense,
-  GrilleTarifaire,
-  GrilleTarifaireDetail,
+  FraisConfiguration,
+  FraisConfigurationFormData,
   ModePaiement,
   Paiement,
-  TarifFormData,
   TypeDepense,
   TypeFrais
 } from '../../../shared/types'
@@ -16,6 +15,7 @@ export interface PaiementFormData {
   eleve_id: number
   annee_scolaire_id: number
   type_frais: TypeFrais
+  frais_modele_id: number
   montant: number
   mode_paiement: ModePaiement
   date_paiement?: string
@@ -43,6 +43,7 @@ export interface SituationFinanciere {
   reste: number
   statut: 'a_jour' | 'partiel' | 'impaye'
   details: {
+    frais_modele_id: number
     type_frais: TypeFrais
     libelle: string
     montant_du: number
@@ -115,100 +116,142 @@ function generateNumeroRecu(): string {
   return `REC-${year}-${String(count).padStart(5, '0')}`
 }
 
-export function listGrilleTarifaire(anneeScolaireId: number): GrilleTarifaireDetail[] {
-  return getDb()
+export function listFraisConfigurations(anneeScolaireId: number): FraisConfiguration[] {
+  const db = getDb()
+  const models = db
     .prepare(
-      `SELECT g.*, n.nom as niveau_nom, s.code as section_code
-       FROM grille_tarifaire g
-       JOIN niveaux n ON n.id = g.niveau_id
-       JOIN sections s ON s.id = g.section_id
-       WHERE g.annee_scolaire_id = ?
-       ORDER BY s.code, n.ordre, g.type_frais`
+      `SELECT * FROM frais_modeles
+       WHERE annee_scolaire_id = ?
+       ORDER BY CASE type_frais
+         WHEN 'inscription' THEN 1 WHEN 'scolarite' THEN 2 ELSE 3 END, libelle`
     )
-    .all(anneeScolaireId) as GrilleTarifaireDetail[]
+    .all(anneeScolaireId) as {
+    id: number
+    annee_scolaire_id: number
+    type_frais: TypeFrais
+    libelle: string
+    mode_tarification: 'unique' | 'par_classe'
+    obligatoire: number
+  }[]
+
+  return models.map((model) => {
+    const amounts = db
+      .prepare(
+        `SELECT fm.classe_id, c.nom as classe_nom, fm.montant
+         FROM frais_montants fm
+         LEFT JOIN classes c ON c.id = fm.classe_id
+         WHERE fm.frais_modele_id = ?
+         ORDER BY c.nom`
+      )
+      .all(model.id) as { classe_id: number | null; classe_nom: string | null; montant: number }[]
+    const uniqueAmount = amounts.find((amount) => amount.classe_id === null)?.montant ?? null
+
+    return {
+      ...model,
+      obligatoire: Boolean(model.obligatoire),
+      montant_unique: uniqueAmount,
+      montants_par_classe: amounts
+        .filter((amount): amount is { classe_id: number; classe_nom: string; montant: number } =>
+          amount.classe_id !== null
+        )
+        .map((amount) => ({
+          classe_id: amount.classe_id,
+          classe_nom: amount.classe_nom || '',
+          montant: amount.montant
+        }))
+    }
+  })
 }
 
-export function upsertTarif(data: TarifFormData, userId?: number): GrilleTarifaireDetail {
-  if (!data.libelle.trim()) throw new Error('Le libellé du frais est requis')
-  if (!Number.isFinite(data.montant) || data.montant <= 0) {
-    throw new Error('Le montant doit être supérieur à zéro')
+export function upsertFraisConfiguration(
+  data: FraisConfigurationFormData,
+  userId?: number
+): FraisConfiguration {
+  if (!data.libelle.trim()) throw new Error('Le nom du module de frais est requis')
+  const db = getDb()
+  const classes = db
+    .prepare('SELECT id FROM classes WHERE annee_scolaire_id = ? ORDER BY id')
+    .all(data.annee_scolaire_id) as { id: number }[]
+  if (classes.length === 0) {
+    throw new Error('Aucune classe configurée pour cette année scolaire')
   }
 
-  const db = getDb()
-  const niveau = db
-    .prepare('SELECT id FROM niveaux WHERE id = ? AND section_id = ?')
-    .get(data.niveau_id, data.section_id)
-  if (!niveau) throw new Error('Le niveau ne correspond pas à la section sélectionnée')
-
-  db.prepare(
-    `INSERT INTO grille_tarifaire
-      (annee_scolaire_id, niveau_id, section_id, type_frais, libelle, montant)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(annee_scolaire_id, niveau_id, section_id, type_frais)
-     DO UPDATE SET libelle = excluded.libelle, montant = excluded.montant`
-  ).run(
-    data.annee_scolaire_id,
-    data.niveau_id,
-    data.section_id,
-    data.type_frais,
-    data.libelle.trim(),
-    data.montant
-  )
-
-  const tarif = db
-    .prepare(
-      `SELECT g.*, n.nom as niveau_nom, s.code as section_code
-       FROM grille_tarifaire g
-       JOIN niveaux n ON n.id = g.niveau_id
-       JOIN sections s ON s.id = g.section_id
-       WHERE g.annee_scolaire_id = ? AND g.niveau_id = ?
-         AND g.section_id = ? AND g.type_frais = ?`
+  if (data.mode_tarification === 'unique') {
+    if (!data.montant_unique || data.montant_unique <= 0) {
+      throw new Error('Le prix unique doit être supérieur à zéro')
+    }
+  } else {
+    const amounts = new Map(
+      (data.montants_par_classe ?? []).map((amount) => [amount.classe_id, amount.montant])
     )
-    .get(
-      data.annee_scolaire_id,
-      data.niveau_id,
-      data.section_id,
-      data.type_frais
-    ) as GrilleTarifaireDetail
+    const missing = classes.some((classe) => !amounts.get(classe.id) || amounts.get(classe.id)! <= 0)
+    if (missing) throw new Error('Un montant positif doit être défini pour chaque classe')
+  }
 
-  logActivity(
-    userId ?? null,
-    'configuration',
-    'tarif',
-    tarif.id,
-    `${tarif.libelle}: ${tarif.montant}`
-  )
-  return tarif
+  let modelId = data.id
+  const save = db.transaction(() => {
+    if (modelId) {
+      const existing = db.prepare('SELECT id FROM frais_modeles WHERE id = ?').get(modelId)
+      if (!existing) throw new Error('Module de frais introuvable')
+      db.prepare(
+        `UPDATE frais_modeles
+         SET type_frais = ?, libelle = ?, mode_tarification = ?, obligatoire = ?
+         WHERE id = ?`
+      ).run(
+        data.type_frais,
+        data.libelle.trim(),
+        data.mode_tarification,
+        data.obligatoire === false ? 0 : 1,
+        modelId
+      )
+    } else {
+      const result = db
+        .prepare(
+          `INSERT INTO frais_modeles
+            (annee_scolaire_id, type_frais, libelle, mode_tarification, obligatoire)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+        .run(
+          data.annee_scolaire_id,
+          data.type_frais,
+          data.libelle.trim(),
+          data.mode_tarification,
+          data.obligatoire === false ? 0 : 1
+        )
+      modelId = Number(result.lastInsertRowid)
+    }
+
+    db.prepare('DELETE FROM frais_montants WHERE frais_modele_id = ?').run(modelId)
+    const insertAmount = db.prepare(
+      'INSERT INTO frais_montants (frais_modele_id, classe_id, montant) VALUES (?, ?, ?)'
+    )
+    if (data.mode_tarification === 'unique') {
+      insertAmount.run(modelId, null, data.montant_unique)
+    } else {
+      for (const amount of data.montants_par_classe ?? []) {
+        insertAmount.run(modelId, amount.classe_id, amount.montant)
+      }
+    }
+    logActivity(userId ?? null, 'configuration', 'frais_modele', modelId!, data.libelle.trim())
+  })
+  save()
+
+  return listFraisConfigurations(data.annee_scolaire_id).find(
+    (configuration) => configuration.id === modelId
+  )!
 }
 
-export function deleteTarif(id: number, userId?: number): boolean {
+export function deleteFraisConfiguration(id: number, userId?: number): boolean {
   const db = getDb()
-  const tarif = db.prepare('SELECT * FROM grille_tarifaire WHERE id = ?').get(id) as
-    | GrilleTarifaire
+  const model = db.prepare('SELECT * FROM frais_modeles WHERE id = ?').get(id) as
+    | { id: number; libelle: string }
     | undefined
-  if (!tarif) throw new Error('Frais introuvable')
-
-  const payment = db
-    .prepare(
-      `SELECT 1 FROM paiements p
-       JOIN inscriptions i ON i.eleve_id = p.eleve_id
-         AND i.annee_scolaire_id = p.annee_scolaire_id
-       WHERE p.annee_scolaire_id = ? AND p.type_frais = ?
-         AND i.niveau_id = ? AND i.section_id = ?
-       LIMIT 1`
-    )
-    .get(
-      tarif.annee_scolaire_id,
-      tarif.type_frais,
-      tarif.niveau_id,
-      tarif.section_id
-    )
-  if (payment) {
-    throw new Error('Ce frais possède déjà des paiements et ne peut pas être supprimé')
+  if (!model) throw new Error('Module de frais introuvable')
+  if (db.prepare('SELECT 1 FROM paiements WHERE frais_modele_id = ? LIMIT 1').get(id)) {
+    throw new Error('Ce module possède déjà des paiements et ne peut pas être supprimé')
   }
-
-  db.prepare('DELETE FROM grille_tarifaire WHERE id = ?').run(id)
-  logActivity(userId ?? null, 'suppression', 'tarif', id, tarif.libelle)
+  db.prepare('DELETE FROM frais_modeles WHERE id = ?').run(id)
+  logActivity(userId ?? null, 'suppression', 'frais_modele', id, model.libelle)
   return true
 }
 
@@ -222,7 +265,7 @@ export function getSituationFinanciere(
     .prepare(
       `SELECT e.id as eleve_id, e.nom, e.prenom, e.matricule,
               c.nom as classe_nom, s.code as section_code,
-              i.niveau_id, i.section_id
+              i.niveau_id, i.section_id, i.classe_id
        FROM eleves e
        JOIN inscriptions i ON i.eleve_id = e.id AND i.annee_scolaire_id = ?
        JOIN classes c ON c.id = i.classe_id
@@ -238,16 +281,25 @@ export function getSituationFinanciere(
     section_code: string
     niveau_id: number
     section_id: number
+    classe_id: number
   } | undefined
 
   if (!eleve) return null
 
-  const tarifs = db
+  const frais = db
     .prepare(
-      `SELECT type_frais, libelle, montant FROM grille_tarifaire
-       WHERE annee_scolaire_id = ? AND niveau_id = ? AND section_id = ?`
+      `SELECT f.id as frais_modele_id, f.type_frais, f.libelle, m.montant
+       FROM frais_modeles f
+       JOIN frais_montants m ON m.frais_modele_id = f.id
+       WHERE f.annee_scolaire_id = ?
+         AND (
+           (f.mode_tarification = 'unique' AND m.classe_id IS NULL)
+           OR (f.mode_tarification = 'par_classe' AND m.classe_id = ?)
+         )
+       ORDER BY f.id`
     )
-    .all(anneeScolaireId, eleve.niveau_id, eleve.section_id) as {
+    .all(anneeScolaireId, eleve.classe_id) as {
+    frais_modele_id: number
     type_frais: TypeFrais
     libelle: string
     montant: number
@@ -255,22 +307,38 @@ export function getSituationFinanciere(
 
   const paiements = db
     .prepare(
-      `SELECT type_frais, COALESCE(SUM(montant), 0) as total
+      `SELECT frais_modele_id, type_frais, COALESCE(SUM(montant), 0) as total
        FROM paiements WHERE eleve_id = ? AND annee_scolaire_id = ?
-       GROUP BY type_frais`
+       GROUP BY frais_modele_id, type_frais`
     )
-    .all(eleveId, anneeScolaireId) as { type_frais: TypeFrais; total: number }[]
+    .all(eleveId, anneeScolaireId) as {
+    frais_modele_id: number | null
+    type_frais: TypeFrais
+    total: number
+  }[]
 
-  const paiementsMap = new Map(paiements.map((p) => [p.type_frais, p.total]))
+  const paiementsParModele = new Map(
+    paiements
+      .filter((paiement) => paiement.frais_modele_id !== null)
+      .map((paiement) => [paiement.frais_modele_id, paiement.total])
+  )
+  const paiementsLegacy = new Map(
+    paiements
+      .filter((paiement) => paiement.frais_modele_id === null)
+      .map((paiement) => [paiement.type_frais, paiement.total])
+  )
 
-  const details = tarifs.map((t) => {
-    const paye = paiementsMap.get(t.type_frais) || 0
+  const details = frais.map((item) => {
+    const paye =
+      (paiementsParModele.get(item.frais_modele_id) || 0) +
+      (paiementsLegacy.get(item.type_frais) || 0)
     return {
-      type_frais: t.type_frais,
-      libelle: t.libelle,
-      montant_du: t.montant,
+      frais_modele_id: item.frais_modele_id,
+      type_frais: item.type_frais,
+      libelle: item.libelle,
+      montant_du: item.montant,
       montant_paye: paye,
-      reste: Math.max(0, t.montant - paye)
+      reste: Math.max(0, item.montant - paye)
     }
   })
 
@@ -299,17 +367,28 @@ export function getSituationFinanciere(
 
 export function createPaiement(data: PaiementFormData, userId?: number): Paiement {
   const db = getDb()
+  const situation = getSituationFinanciere(data.eleve_id, data.annee_scolaire_id)
+  const frais = situation?.details.find(
+    (detail) => detail.frais_modele_id === data.frais_modele_id
+  )
+  if (!frais) throw new Error("Ce module de frais ne s'applique pas à la classe de l'élève")
+  if (data.montant > frais.reste) {
+    throw new Error(`Le montant dépasse le reste à payer (${frais.reste} FCFA)`)
+  }
   const numeroRecu = generateNumeroRecu()
 
   const result = db
     .prepare(
-      `INSERT INTO paiements (eleve_id, annee_scolaire_id, type_frais, montant, mode_paiement, numero_recu, date_paiement, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO paiements
+        (eleve_id, annee_scolaire_id, type_frais, frais_modele_id, montant,
+         mode_paiement, numero_recu, date_paiement, notes, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       data.eleve_id,
       data.annee_scolaire_id,
-      data.type_frais,
+      frais.type_frais,
+      data.frais_modele_id,
       data.montant,
       data.mode_paiement,
       numeroRecu,
@@ -408,11 +487,17 @@ export function getRecuData(paiementId: number): RecuData | null {
   const situation = getSituationFinanciere(paiement.eleve_id, paiement.annee_scolaire_id)
   const tarif = db
     .prepare(
-      `SELECT libelle FROM grille_tarifaire
-       WHERE annee_scolaire_id = ? AND type_frais = ?
+      `SELECT libelle FROM frais_modeles
+       WHERE annee_scolaire_id = ?
+         AND (id = ? OR (? IS NULL AND type_frais = ?))
        LIMIT 1`
     )
-    .get(paiement.annee_scolaire_id, paiement.type_frais) as { libelle: string } | undefined
+    .get(
+      paiement.annee_scolaire_id,
+      paiement.frais_modele_id,
+      paiement.frais_modele_id,
+      paiement.type_frais
+    ) as { libelle: string } | undefined
 
   return {
     paiement,
@@ -536,24 +621,21 @@ export function getFinancesDashboard(anneeScolaireId: number): FinancesDashboard
   const eleves_impayes = impayes.length
   const eleves_a_jour = totalEleves - eleves_impayes
 
-  // Total attendu = sum of all tarifs for all active students
-  let totalAttendu = 0
-  const inscriptions = db
-    .prepare(
-      `SELECT eleve_id, niveau_id, section_id FROM inscriptions
-       WHERE annee_scolaire_id = ? AND statut = 'actif'`
-    )
-    .all(anneeScolaireId) as { eleve_id: number; niveau_id: number; section_id: number }[]
-
-  for (const ins of inscriptions) {
-    const tarif = db
+  const totalAttendu = (
+    db
       .prepare(
-        `SELECT COALESCE(SUM(montant), 0) as t FROM grille_tarifaire
-         WHERE annee_scolaire_id = ? AND niveau_id = ? AND section_id = ?`
+        `SELECT COALESCE(SUM(m.montant), 0) as t
+         FROM inscriptions i
+         JOIN frais_modeles f ON f.annee_scolaire_id = i.annee_scolaire_id
+         JOIN frais_montants m ON m.frais_modele_id = f.id
+           AND (
+             (f.mode_tarification = 'unique' AND m.classe_id IS NULL)
+             OR (f.mode_tarification = 'par_classe' AND m.classe_id = i.classe_id)
+           )
+         WHERE i.annee_scolaire_id = ? AND i.statut = 'actif'`
       )
-      .get(anneeScolaireId, ins.niveau_id, ins.section_id) as { t: number }
-    totalAttendu += tarif.t
-  }
+      .get(anneeScolaireId) as { t: number }
+  ).t
 
   const taux_recouvrement =
     totalAttendu > 0 ? Math.round((recettes_annee / totalAttendu) * 10000) / 100 : 0

@@ -429,6 +429,7 @@ export function exitDemoMode(userId?: number): DemoResetResult {
     db.prepare('DELETE FROM enseignants').run()
 
     db.prepare('DELETE FROM depenses').run()
+    db.prepare('DELETE FROM frais_modeles').run()
     db.prepare('DELETE FROM grille_tarifaire').run()
     db.prepare('DELETE FROM echeancier_paiements').run()
     db.prepare('DELETE FROM journal_activite').run()

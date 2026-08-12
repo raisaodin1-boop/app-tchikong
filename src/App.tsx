@@ -22,6 +22,7 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import PersonnelPage from './pages/admin/PersonnelPage'
 import ClassesPage from './pages/admin/ClassesPage'
 import FraisScolairesPage from './pages/admin/FraisScolairesPage'
+import AnneesScolairesPage from './pages/admin/AnneesScolairesPage'
 import UtilisateursPage from './pages/admin/UtilisateursPage'
 import DocumentsPage from './pages/admin/DocumentsPage'
 import JournalPage from './pages/admin/JournalPage'
@@ -88,6 +89,14 @@ export default function App() {
             element={
               <DirectriceRoute>
                 <FraisScolairesPage />
+              </DirectriceRoute>
+            }
+          />
+          <Route
+            path="annees"
+            element={
+              <DirectriceRoute>
+                <AnneesScolairesPage />
               </DirectriceRoute>
             }
           />

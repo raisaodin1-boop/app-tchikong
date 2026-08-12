@@ -20,6 +20,7 @@ Application desktop de gestion scolaire pour le **Groupe Scolaire Bilingue Prima
 | Documents PDF (attestations, certificats, listes) | ✅ |
 | Finances (paiements, reçus PDF, impayés, dépenses) | ✅ |
 | Administratif (personnel, classes, utilisateurs, documents) | ✅ |
+| Démarrage d'année et modules de frais configurables par la directrice | ✅ |
 
 ## Deux modes entièrement hors connexion
 
@@ -34,6 +35,16 @@ Internet. Aucune donnée scolaire n'est envoyée à Vercel ou à une API distant
 > Les données du navigateur appartiennent au navigateur et à l'appareil utilisés. Utilisez
 > régulièrement **Sauvegarder** pour télécharger une copie `.db`, et **Restaurer** pour la
 > réimporter. Ne videz pas les données du site sans sauvegarde.
+
+### Début d'une année scolaire
+
+Dans **Administration → Années scolaires**, la directrice démarre la nouvelle année. Les classes
+et capacités de l'année précédente sont copiées, sans copier les élèves ni les paiements. Elle est
+ensuite dirigée vers **Administration → Frais scolaires** pour créer chaque module à payer
+(scolarité, inscription, tenues, fournitures ou module libre) avec :
+
+- un prix unique applicable à toutes les classes ; ou
+- un montant obligatoire défini séparément pour chaque classe.
 
 ---
 

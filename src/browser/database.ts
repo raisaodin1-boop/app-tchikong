@@ -2,6 +2,7 @@ import initSqlJs, { type BindParams, type Database, type SqlJsStatic } from 'sql
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 import migrationSql from '../../db/migrations/001_initial_schema.sql?raw'
 import settingsMigrationSql from '../../db/migrations/002_app_settings.sql?raw'
+import feeModulesMigrationSql from '../../db/migrations/003_fee_modules.sql?raw'
 
 const STORAGE_DB = 'tchikong-offline-storage'
 const STORAGE_VERSION = 1
@@ -143,13 +144,49 @@ function requireDatabase(): Database {
   return database
 }
 
+function runBrowserMigrations(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS migrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version INTEGER NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+  const migrations = [
+    { version: 1, name: 'initial_schema', sql: migrationSql },
+    { version: 2, name: 'app_settings', sql: settingsMigrationSql },
+    { version: 3, name: 'fee_modules', sql: feeModulesMigrationSql }
+  ]
+
+  for (const migration of migrations) {
+    const statement = db.prepare('SELECT 1 FROM migrations WHERE version = ?')
+    statement.bind([migration.version])
+    const applied = statement.step()
+    statement.free()
+    if (applied) continue
+
+    db.exec('BEGIN')
+    try {
+      db.exec(migration.sql)
+      db.run('INSERT INTO migrations (version, name) VALUES (?, ?)', [
+        migration.version,
+        migration.name
+      ])
+      db.exec('COMMIT')
+    } catch (error) {
+      db.exec('ROLLBACK')
+      throw error
+    }
+  }
+}
+
 export async function initBrowserDatabase(): Promise<void> {
   SQL = await initSqlJs({ locateFile: () => wasmUrl })
   const stored = await readStoredDatabase()
   database = stored ? new SQL.Database(stored) : new SQL.Database()
   database.run('PRAGMA foreign_keys = ON')
-  database.exec(migrationSql)
-  database.exec(settingsMigrationSql)
+  runBrowserMigrations(database)
   dirty = !stored
 
   if (navigator.storage?.persist) {
@@ -184,8 +221,7 @@ export async function importDatabase(bytes: Uint8Array): Promise<void> {
     replacement.close()
     throw new Error('La sauvegarde SQLite est endommagée')
   }
-  replacement.exec(migrationSql)
-  replacement.exec(settingsMigrationSql)
+  runBrowserMigrations(replacement)
   database?.close()
   database = replacement
   dirty = true

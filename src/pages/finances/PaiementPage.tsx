@@ -2,17 +2,7 @@ import { useEffect, useState } from 'react'
 import { Search, Save, Printer, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
-import type { Inscription, ModePaiement, SituationFinanciere, TypeFrais, Paiement } from '@shared/types'
-
-const TYPE_FRAIS_OPTIONS: { value: TypeFrais; label: string }[] = [
-  { value: 'scolarite', label: 'Frais de scolarité' },
-  { value: 'inscription', label: 'Inscription' },
-  { value: 'uniforme', label: 'Uniforme' },
-  { value: 'fournitures', label: 'Fournitures' },
-  { value: 'examen', label: 'Examen' },
-  { value: 'activite', label: 'Activités' },
-  { value: 'autre', label: 'Autre' }
-]
+import type { Inscription, ModePaiement, SituationFinanciere, Paiement } from '@shared/types'
 
 const MODE_OPTIONS: { value: ModePaiement; label: string }[] = [
   { value: 'especes', label: 'Espèces' },
@@ -33,7 +23,7 @@ export default function PaiementPage() {
   const [eleveSelectionne, setEleveSelectionne] = useState<Inscription | null>(null)
   const [situation, setSituation] = useState<SituationFinanciere | null>(null)
   const [form, setForm] = useState({
-    type_frais: 'scolarite' as TypeFrais,
+    frais_modele_id: 0,
     montant: '',
     mode_paiement: 'especes' as ModePaiement,
     date_paiement: new Date().toISOString().slice(0, 10),
@@ -41,6 +31,7 @@ export default function PaiementPage() {
   })
   const [saving, setSaving] = useState(false)
   const [dernierPaiement, setDernierPaiement] = useState<Paiement | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (recherche.length < 2) {
@@ -65,19 +56,23 @@ export default function PaiementPage() {
       if (sit) {
         const detail = sit.details.find(
           (d: SituationFinanciere['details'][number]) => d.type_frais === 'scolarite'
-        )
-        if (detail && detail.reste > 0) {
-          setForm((f) => ({ ...f, type_frais: 'scolarite', montant: String(detail.reste) }))
+        ) ?? sit.details.find((item: SituationFinanciere['details'][number]) => item.reste > 0)
+        if (detail) {
+          setForm((f) => ({
+            ...f,
+            frais_modele_id: detail.frais_modele_id,
+            montant: detail.reste > 0 ? String(detail.reste) : ''
+          }))
         }
       }
     }
   }
 
-  const handleTypeChange = (type: TypeFrais) => {
-    const detail = situation?.details.find((d) => d.type_frais === type)
+  const handleTypeChange = (id: number) => {
+    const detail = situation?.details.find((item) => item.frais_modele_id === id)
     setForm((f) => ({
       ...f,
-      type_frais: type,
+      frais_modele_id: id,
       montant: detail && detail.reste > 0 ? String(detail.reste) : f.montant
     }))
   }
@@ -87,24 +82,35 @@ export default function PaiementPage() {
     if (!token || !anneeActive || !eleveSelectionne) return
     const montant = Number(form.montant)
     if (!montant || montant <= 0) return
+    const selectedFee = situation?.details.find(
+      (detail) => detail.frais_modele_id === form.frais_modele_id
+    )
+    if (!selectedFee) return
 
     setSaving(true)
-    const paiement = await window.api.createPaiement(
-      {
-        eleve_id: eleveSelectionne.eleve_id,
-        annee_scolaire_id: anneeActive.id,
-        type_frais: form.type_frais,
-        montant,
-        mode_paiement: form.mode_paiement,
-        date_paiement: form.date_paiement,
-        notes: form.notes || undefined
-      },
-      token
-    )
-    setDernierPaiement(paiement)
-    const sit = await window.api.getSituationFinanciere(eleveSelectionne.eleve_id, anneeActive.id)
-    setSituation(sit)
-    setSaving(false)
+    setError('')
+    try {
+      const paiement = await window.api.createPaiement(
+        {
+          eleve_id: eleveSelectionne.eleve_id,
+          annee_scolaire_id: anneeActive.id,
+          type_frais: selectedFee.type_frais,
+          frais_modele_id: selectedFee.frais_modele_id,
+          montant,
+          mode_paiement: form.mode_paiement,
+          date_paiement: form.date_paiement,
+          notes: form.notes || undefined
+        },
+        token
+      )
+      setDernierPaiement(paiement)
+      const sit = await window.api.getSituationFinanciere(eleveSelectionne.eleve_id, anneeActive.id)
+      setSituation(sit)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "L'enregistrement a échoué")
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handlePrintRecu = async (action: 'save' | 'print') => {
@@ -189,7 +195,7 @@ export default function PaiementPage() {
             </thead>
             <tbody>
               {situation.details.map((d) => (
-                <tr key={d.type_frais} className="border-t border-gray-100">
+                <tr key={d.frais_modele_id} className="border-t border-gray-100">
                   <td className="py-1.5">{d.libelle}</td>
                   <td className="py-1.5 text-right">{formatMoney(d.montant_du)}</td>
                   <td className="py-1.5 text-right text-accent-green">{formatMoney(d.montant_paye)}</td>
@@ -207,16 +213,25 @@ export default function PaiementPage() {
       {eleveSelectionne && (
         <form onSubmit={handleSubmit} className="card p-5">
           <h3 className="font-semibold mb-4">Enregistrer un paiement</h3>
+          {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="label">Type de frais</label>
+              <label className="label">Module à payer</label>
               <select
                 className="input"
-                value={form.type_frais}
-                onChange={(e) => handleTypeChange(e.target.value as TypeFrais)}
+                value={form.frais_modele_id}
+                onChange={(e) => handleTypeChange(Number(e.target.value))}
+                required
               >
-                {TYPE_FRAIS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                <option value={0}>Sélectionner un module</option>
+                {situation?.details.map((detail) => (
+                  <option
+                    key={detail.frais_modele_id}
+                    value={detail.frais_modele_id}
+                    disabled={detail.reste <= 0}
+                  >
+                    {detail.libelle} — reste {formatMoney(detail.reste)}
+                  </option>
                 ))}
               </select>
             </div>

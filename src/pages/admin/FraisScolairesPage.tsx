@@ -1,56 +1,56 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertTriangle, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
 import type {
   DemoStatus,
-  GrilleTarifaireDetail,
-  TarifFormData,
+  FraisConfiguration,
+  FraisConfigurationFormData,
+  ModeTarification,
   TypeFrais
 } from '@shared/types'
 
 const FRAIS_OPTIONS: { value: TypeFrais; label: string }[] = [
   { value: 'scolarite', label: 'Frais de scolarité' },
   { value: 'inscription', label: "Frais d'inscription" },
-  { value: 'uniforme', label: 'Uniforme' },
+  { value: 'uniforme', label: 'Tenue scolaire ou sportive' },
   { value: 'fournitures', label: 'Fournitures' },
   { value: 'examen', label: "Frais d'examen" },
   { value: 'activite', label: 'Activité' },
-  { value: 'autre', label: 'Autre frais' }
+  { value: 'autre', label: 'Autre module' }
 ]
 
-const defaultForm = {
-  section_id: 0,
-  niveau_id: 0,
+const formatMoney = (amount: number) =>
+  `${new Intl.NumberFormat('fr-FR').format(amount)} FCFA`
+
+const emptyForm = {
   type_frais: 'scolarite' as TypeFrais,
   libelle: 'Frais de scolarité',
-  montant: ''
+  mode_tarification: 'par_classe' as ModeTarification,
+  montant_unique: '',
+  montants: {} as Record<number, string>
 }
 
 export default function FraisScolairesPage() {
   const { user, token } = useAuth()
-  const { anneeActive, sections, niveaux } = useApp()
-  const [tarifs, setTarifs] = useState<GrilleTarifaireDetail[]>([])
+  const { anneeActive, classes } = useApp()
+  const [configurations, setConfigurations] = useState<FraisConfiguration[]>([])
   const [demoStatus, setDemoStatus] = useState<DemoStatus | null>(null)
-  const [form, setForm] = useState(defaultForm)
+  const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [copyAmount, setCopyAmount] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [resetting, setResetting] = useState(false)
 
-  const filteredNiveaux = useMemo(
-    () => niveaux.filter((niveau) => niveau.section_id === form.section_id),
-    [niveaux, form.section_id]
-  )
-
   const load = async () => {
     if (!anneeActive || !token || user?.role !== 'directrice') return
     const [fees, status] = await Promise.all([
-      window.api.listGrilleTarifaire(anneeActive.id),
+      window.api.listFraisConfigurations(anneeActive.id),
       window.api.getDemoStatus(token)
     ])
-    setTarifs(fees)
+    setConfigurations(fees)
     setDemoStatus(status)
   }
 
@@ -60,21 +60,10 @@ export default function FraisScolairesPage() {
     })
   }, [anneeActive?.id, token, user?.role])
 
-  useEffect(() => {
-    if (form.section_id || sections.length === 0) return
-    const sectionId = sections[0].id
-    const niveauId = niveaux.find((niveau) => niveau.section_id === sectionId)?.id ?? 0
-    setForm((current) => ({ ...current, section_id: sectionId, niveau_id: niveauId }))
-  }, [sections, niveaux, form.section_id])
-
   const resetForm = () => {
-    const sectionId = sections[0]?.id ?? 0
     setEditingId(null)
-    setForm({
-      ...defaultForm,
-      section_id: sectionId,
-      niveau_id: niveaux.find((niveau) => niveau.section_id === sectionId)?.id ?? 0
-    })
+    setCopyAmount('')
+    setForm({ ...emptyForm, montants: {} })
   }
 
   const handleTypeChange = (type: TypeFrais) => {
@@ -82,38 +71,56 @@ export default function FraisScolairesPage() {
     setForm((current) => ({ ...current, type_frais: type, libelle: label }))
   }
 
-  const handleSectionChange = (sectionId: number) => {
-    const niveauId = niveaux.find((niveau) => niveau.section_id === sectionId)?.id ?? 0
-    setForm((current) => ({ ...current, section_id: sectionId, niveau_id: niveauId }))
+  const applyToAllClasses = () => {
+    if (!copyAmount || Number(copyAmount) <= 0) return
+    setForm((current) => ({
+      ...current,
+      montants: Object.fromEntries(classes.map((classe) => [classe.id, copyAmount]))
+    }))
   }
 
-  const editTarif = (tarif: GrilleTarifaireDetail) => {
-    setEditingId(tarif.id)
+  const editConfiguration = (configuration: FraisConfiguration) => {
+    setEditingId(configuration.id)
     setForm({
-      section_id: tarif.section_id,
-      niveau_id: tarif.niveau_id,
-      type_frais: tarif.type_frais,
-      libelle: tarif.libelle,
-      montant: String(tarif.montant)
+      type_frais: configuration.type_frais,
+      libelle: configuration.libelle,
+      mode_tarification: configuration.mode_tarification,
+      montant_unique: configuration.montant_unique
+        ? String(configuration.montant_unique)
+        : '',
+      montants: Object.fromEntries(
+        configuration.montants_par_classe.map((amount) => [
+          amount.classe_id,
+          String(amount.montant)
+        ])
+      )
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const saveTarif = async (event: React.FormEvent) => {
+  const saveConfiguration = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!anneeActive || !token) return
-    setError('')
     setSaving(true)
+    setError('')
     try {
-      const data: TarifFormData = {
+      const payload: FraisConfigurationFormData = {
+        id: editingId ?? undefined,
         annee_scolaire_id: anneeActive.id,
-        section_id: form.section_id,
-        niveau_id: form.niveau_id,
         type_frais: form.type_frais,
         libelle: form.libelle,
-        montant: Number(form.montant)
+        mode_tarification: form.mode_tarification,
+        montant_unique:
+          form.mode_tarification === 'unique' ? Number(form.montant_unique) : undefined,
+        montants_par_classe:
+          form.mode_tarification === 'par_classe'
+            ? classes.map((classe) => ({
+                classe_id: classe.id,
+                montant: Number(form.montants[classe.id] || 0)
+              }))
+            : undefined
       }
-      await window.api.upsertTarif(data, token)
+      await window.api.upsertFraisConfiguration(payload, token)
       resetForm()
       await load()
     } catch (reason) {
@@ -123,11 +130,11 @@ export default function FraisScolairesPage() {
     }
   }
 
-  const deleteTarif = async (tarif: GrilleTarifaireDetail) => {
-    if (!token || !confirm(`Supprimer « ${tarif.libelle} » pour ${tarif.niveau_nom} ?`)) return
+  const deleteConfiguration = async (configuration: FraisConfiguration) => {
+    if (!token || !confirm(`Supprimer le module « ${configuration.libelle} » ?`)) return
     setError('')
     try {
-      await window.api.deleteTarif(tarif.id, token)
+      await window.api.deleteFraisConfiguration(configuration.id, token)
       await load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'La suppression a échoué')
@@ -177,57 +184,26 @@ export default function FraisScolairesPage() {
         </div>
       )}
 
-      <form onSubmit={saveTarif} className="card p-5">
+      <form onSubmit={saveConfiguration} className="card p-5">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold">
-              {editingId ? 'Modifier un frais' : 'Définir un frais'}
+              {editingId ? 'Modifier un module' : 'Ajouter un module à payer'}
             </h2>
-            <p className="text-sm text-gray-500">Année scolaire {anneeActive.libelle}</p>
+            <p className="text-sm text-gray-500">
+              Configuration {anneeActive.libelle} — tous les montants sont obligatoires
+            </p>
           </div>
           {!editingId && <Plus className="h-5 w-5 text-tchikong-600" />}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
-            <label className="label">Section</label>
-            <select
-              className="input"
-              value={form.section_id}
-              onChange={(event) => handleSectionChange(Number(event.target.value))}
-              required
-            >
-              {sections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.nom}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Niveau</label>
-            <select
-              className="input"
-              value={form.niveau_id}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, niveau_id: Number(event.target.value) }))
-              }
-              required
-            >
-              {filteredNiveaux.map((niveau) => (
-                <option key={niveau.id} value={niveau.id}>
-                  {niveau.nom}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Type de frais</label>
+            <label className="label">Catégorie</label>
             <select
               className="input"
               value={form.type_frais}
               onChange={(event) => handleTypeChange(event.target.value as TypeFrais)}
-              required
             >
               {FRAIS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -237,36 +213,104 @@ export default function FraisScolairesPage() {
             </select>
           </div>
           <div>
-            <label className="label">Libellé</label>
+            <label className="label">Nom affiché du module</label>
             <input
               className="input"
               value={form.libelle}
               onChange={(event) =>
                 setForm((current) => ({ ...current, libelle: event.target.value }))
               }
+              placeholder="Ex. Tenue de sport, Assurance..."
               required
             />
           </div>
           <div>
-            <label className="label">Montant (FCFA)</label>
+            <label className="label">Méthode de tarification</label>
+            <select
+              className="input"
+              value={form.mode_tarification}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  mode_tarification: event.target.value as ModeTarification
+                }))
+              }
+            >
+              <option value="unique">Prix unique — toutes les classes</option>
+              <option value="par_classe">Prix différent par classe</option>
+            </select>
+          </div>
+        </div>
+
+        {form.mode_tarification === 'unique' ? (
+          <div className="mt-4 max-w-xs">
+            <label className="label">Prix unique (FCFA)</label>
             <input
               type="number"
               min={1}
-              step={1}
               className="input"
-              value={form.montant}
+              value={form.montant_unique}
               onChange={(event) =>
-                setForm((current) => ({ ...current, montant: event.target.value }))
+                setForm((current) => ({ ...current, montant_unique: event.target.value }))
               }
               required
             />
           </div>
-        </div>
+        ) : (
+          <div className="mt-5">
+            <div className="mb-3 flex flex-wrap items-end gap-2">
+              <div>
+                <label className="label">Même montant à préremplir</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="input w-48"
+                  value={copyAmount}
+                  onChange={(event) => setCopyAmount(event.target.value)}
+                  placeholder="Montant"
+                />
+              </div>
+              <button type="button" className="btn-secondary btn-sm" onClick={applyToAllClasses}>
+                Appliquer à toutes les classes
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {classes.map((classe) => (
+                <label
+                  key={classe.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3"
+                >
+                  <span className="text-sm font-medium">
+                    {classe.nom}{' '}
+                    <span className="text-xs text-gray-400">({classe.section_code})</span>
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    className="input w-32"
+                    value={form.montants[classe.id] ?? ''}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        montants: {
+                          ...current.montants,
+                          [classe.id]: event.target.value
+                        }
+                      }))
+                    }
+                    placeholder="FCFA"
+                    required
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-5 flex gap-2">
           <button className="btn-primary btn-sm" type="submit" disabled={saving}>
             <Save className="h-4 w-4" />
-            {saving ? 'Enregistrement...' : 'Enregistrer'}
+            {saving ? 'Enregistrement...' : 'Enregistrer le module'}
           </button>
           {editingId && (
             <button className="btn-secondary btn-sm" type="button" onClick={resetForm}>
@@ -276,62 +320,56 @@ export default function FraisScolairesPage() {
         </div>
       </form>
 
-      <div className="table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Section</th>
-              <th>Niveau</th>
-              <th>Type</th>
-              <th>Libellé</th>
-              <th className="text-right">Montant</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {tarifs.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="py-8 text-center text-gray-400">
-                  Aucun frais défini pour cette année scolaire.
-                </td>
-              </tr>
-            ) : (
-              tarifs.map((tarif) => (
-                <tr key={tarif.id}>
-                  <td>
-                    <span className="badge-gray">{tarif.section_code}</span>
-                  </td>
-                  <td>{tarif.niveau_nom}</td>
-                  <td>{FRAIS_OPTIONS.find((option) => option.value === tarif.type_frais)?.label}</td>
-                  <td className="font-medium">{tarif.libelle}</td>
-                  <td className="text-right font-semibold">
-                    {new Intl.NumberFormat('fr-FR').format(tarif.montant)} FCFA
-                  </td>
-                  <td>
-                    <div className="flex justify-end gap-1">
-                      <button
-                        className="btn-icon"
-                        type="button"
-                        onClick={() => editTarif(tarif)}
-                        title="Modifier"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        className="btn-icon text-red-600"
-                        type="button"
-                        onClick={() => deleteTarif(tarif)}
-                        title="Supprimer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+      <div className="space-y-3">
+        {configurations.length === 0 ? (
+          <div className="card p-8 text-center text-gray-400">
+            Aucun module configuré. Ajoutez la scolarité, les tenues, les fournitures et les autres
+            frais avant de commencer les encaissements.
+          </div>
+        ) : (
+          configurations.map((configuration) => (
+            <article key={configuration.id} className="card p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold">{configuration.libelle}</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {configuration.mode_tarification === 'unique'
+                      ? `Prix unique : ${formatMoney(configuration.montant_unique || 0)}`
+                      : `Prix par classe — ${configuration.montants_par_classe.length} classes`}
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    onClick={() => editConfiguration(configuration)}
+                    title="Modifier"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon text-red-600"
+                    onClick={() => deleteConfiguration(configuration)}
+                    title="Supprimer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              {configuration.mode_tarification === 'par_classe' && (
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3 md:grid-cols-4">
+                  {configuration.montants_par_classe.map((amount) => (
+                    <div key={amount.classe_id} className="text-sm">
+                      <span className="text-gray-500">{amount.classe_nom} :</span>{' '}
+                      <span className="font-medium">{formatMoney(amount.montant)}</span>
                     </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  ))}
+                </div>
+              )}
+            </article>
+          ))
+        )}
       </div>
 
       <section className="card border border-red-200 p-5">
@@ -342,8 +380,8 @@ export default function FraisScolairesPage() {
             {demoStatus?.active ? (
               <>
                 <p className="mt-1 text-sm text-gray-600">
-                  {demoStatus.eleves} élèves fictifs sont actuellement présents. La sortie conserve
-                  les comptes, sections, niveaux, matières, année scolaire et classes.
+                  {demoStatus.eleves} élèves fictifs sont présents. Les comptes, référentiels,
+                  année scolaire et classes seront conservés.
                 </p>
                 <button type="button" className="btn-secondary btn-sm mt-3" onClick={backup}>
                   <Save className="h-4 w-4" />
@@ -362,7 +400,7 @@ export default function FraisScolairesPage() {
                 </div>
                 <button
                   type="button"
-                  className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
                   onClick={exitDemo}
                   disabled={confirmation !== 'QUITTER DEMO' || resetting}
                 >
@@ -371,7 +409,7 @@ export default function FraisScolairesPage() {
               </>
             ) : (
               <p className="mt-1 text-sm font-medium text-green-700">
-                Le mode démonstration est désactivé. Les nouvelles données sont des données réelles.
+                Le mode démonstration est désactivé.
               </p>
             )}
           </div>

@@ -156,6 +156,13 @@ const browserApi = {
   listNiveaux: async (sectionId?: number) => referentielService.listNiveaux(sectionId),
   listAnnees: async () => referentielService.listAnnees(),
   getActiveAnnee: async () => referentielService.getActiveAnnee(),
+  startNewAnnee: async (
+    data: import('../../shared/types').NouvelleAnneeFormData,
+    token: string
+  ) => {
+    requireDirector(token)
+    return mutate(() => referentielService.startNewAnnee(data, userId(token)))
+  },
   listClasses: async (anneeId?: number) => referentielService.listClasses(anneeId),
 
   listEleves: async (filters?: EleveFiltres) => elevesService.listEleves(filters),
@@ -292,15 +299,18 @@ const browserApi = {
     financesService.getFinancesDashboard(anneeId),
   getSituationFinanciere: async (eleveId: number, anneeId: number) =>
     financesService.getSituationFinanciere(eleveId, anneeId),
-  listGrilleTarifaire: async (anneeId: number) =>
-    financesService.listGrilleTarifaire(anneeId),
-  upsertTarif: async (data: import('../../shared/types').TarifFormData, token: string) => {
+  listFraisConfigurations: async (anneeId: number) =>
+    financesService.listFraisConfigurations(anneeId),
+  upsertFraisConfiguration: async (
+    data: import('../../shared/types').FraisConfigurationFormData,
+    token: string
+  ) => {
     requireDirector(token)
-    return mutate(() => financesService.upsertTarif(data, userId(token)))
+    return mutate(() => financesService.upsertFraisConfiguration(data, userId(token)))
   },
-  deleteTarif: async (id: number, token: string) => {
+  deleteFraisConfiguration: async (id: number, token: string) => {
     requireDirector(token)
-    return mutate(() => financesService.deleteTarif(id, userId(token)))
+    return mutate(() => financesService.deleteFraisConfiguration(id, userId(token)))
   },
   createPaiement: async (data: PaiementFormData, token: string) =>
     mutate(() => financesService.createPaiement(data, userId(token))),

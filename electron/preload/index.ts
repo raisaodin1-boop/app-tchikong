@@ -48,6 +48,11 @@ const api = {
   listAnnees: (): Promise<AnneeScolaire[]> => ipcRenderer.invoke(IPC_CHANNELS.ANNEE_LIST),
   getActiveAnnee: (): Promise<AnneeScolaire | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.ANNEE_GET_ACTIVE),
+  startNewAnnee: (
+    data: import('../../shared/types').NouvelleAnneeFormData,
+    token: string
+  ): Promise<import('../../shared/types').NouvelleAnneeResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ANNEE_START, data, token),
   listClasses: (anneeId?: number): Promise<Classe[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.CLASSE_LIST, anneeId),
 
@@ -157,11 +162,14 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DASHBOARD, anneeId),
   getSituationFinanciere: (eleveId: number, anneeId: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_SITUATION, eleveId, anneeId),
-  listGrilleTarifaire: (anneeId: number) =>
+  listFraisConfigurations: (anneeId: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE, anneeId),
-  upsertTarif: (data: import('../../shared/types').TarifFormData, token: string) =>
+  upsertFraisConfiguration: (
+    data: import('../../shared/types').FraisConfigurationFormData,
+    token: string
+  ) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE_UPSERT, data, token),
-  deleteTarif: (id: number, token: string): Promise<boolean> =>
+  deleteFraisConfiguration: (id: number, token: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE_DELETE, id, token),
   createPaiement: (data: import('../../shared/types').PaiementFormData, token: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, data, token),
