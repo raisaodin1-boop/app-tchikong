@@ -21,6 +21,9 @@ Application desktop de gestion scolaire pour le **Groupe Scolaire Bilingue Prima
 | Finances (paiements, reçus PDF, impayés, dépenses) | ✅ |
 | Administratif (personnel, classes, utilisateurs, documents) | ✅ |
 | Démarrage d'année et modules de frais configurables par la directrice | ✅ |
+| Paie mensuelle du personnel avec validation et journal automatique | ✅ |
+| Bilan annuel par classe et par élève, exportable vers Excel | ✅ |
+| Bulletins premium avec statistiques de classe et QR d'authenticité | ✅ |
 
 ## Deux modes entièrement hors connexion
 
@@ -45,6 +48,15 @@ ensuite dirigée vers **Administration → Frais scolaires** pour créer chaque 
 
 - un prix unique applicable à toutes les classes ; ou
 - un montant obligatoire défini séparément pour chaque classe.
+
+Le personnel actif est également inscrit dans la nouvelle année. Dans
+**Administration → Paie du personnel**, la directrice définit les salaires mensuels puis confirme,
+mois par mois, ceux qui ont été effectivement perçus. Chaque validation crée automatiquement la
+dépense correspondante.
+
+Le **Bilan annuel** du module Finances consolide les effectifs, montants attendus, montants perçus,
+impayés, salaires, autres dépenses et solde. Il contient un journal individuel de tous les élèves
+et peut être exporté en CSV compatible Excel.
 
 ---
 
