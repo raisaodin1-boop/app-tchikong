@@ -30,6 +30,7 @@ import {
 } from './database'
 
 type PdfResult = { success: boolean; path?: string; error?: string; printed?: boolean }
+const BROWSER_SESSION_PREFIX = 'tchikong_browser_session_'
 
 function userId(token: string): number | undefined {
   return authService.getCurrentUserId(token) ?? undefined
@@ -46,6 +47,13 @@ function requireFinanceAccess(token: string): void {
   const session = authService.getSession(token)
   if (!session || !['directrice', 'comptable'].includes(session.utilisateur.role)) {
     throw new Error('Accès réservé à la direction et à la comptabilité')
+  }
+}
+
+function requireAcademicAccess(token: string): void {
+  const session = authService.getSession(token)
+  if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+    throw new Error('Accès réservé à la direction et au secrétariat')
   }
 }
 
@@ -138,24 +146,54 @@ async function handlePdf(
 }
 
 const browserApi = {
-  login: async (request: { username: string; password: string }) =>
-    mutate(() => authService.login(request)),
+  login: async (request: { username: string; password: string }) => {
+    const session = await mutate(() => authService.login(request))
+    if (session) {
+      localStorage.setItem(
+        `${BROWSER_SESSION_PREFIX}${session.token}`,
+        JSON.stringify({
+          utilisateurId: session.utilisateur.id,
+          expiresAt: Date.now() + 8 * 60 * 60 * 1000
+        })
+      )
+    }
+    return session
+  },
   logout: async (token: string) => {
     authService.logout(token)
+    localStorage.removeItem(`${BROWSER_SESSION_PREFIX}${token}`)
     await flushDatabase()
     return true
   },
-  getSession: async (token: string) => authService.getSession(token),
+  getSession: async (token: string) => {
+    const active = authService.getSession(token)
+    if (active) return active
+    const stored = localStorage.getItem(`${BROWSER_SESSION_PREFIX}${token}`)
+    if (!stored) return null
+    try {
+      const session = JSON.parse(stored) as { utilisateurId: number; expiresAt: number }
+      const restored = authService.restoreSession(token, session.utilisateurId, session.expiresAt)
+      if (!restored) localStorage.removeItem(`${BROWSER_SESSION_PREFIX}${token}`)
+      return restored
+    } catch {
+      localStorage.removeItem(`${BROWSER_SESSION_PREFIX}${token}`)
+      return null
+    }
+  },
 
   backupDb: async () => {
     const filename = `tchikong-backup-${new Date().toISOString().slice(0, 10)}.db`
     downloadBytes(await exportDatabase(), filename, 'application/x-sqlite3')
     return { success: true, path: filename }
   },
-  restoreDb: async () => {
+  restoreDb: async (token: string) => {
+    requireDirector(token)
     const bytes = await chooseDatabaseFile()
     if (!bytes) return { success: false }
     await importDatabase(bytes)
+    authService.clearSessions()
+    localStorage.removeItem(`${BROWSER_SESSION_PREFIX}${token}`)
+    localStorage.removeItem('tchikong_token')
     return { success: true }
   },
   getDbPath: async () => 'Stockage local sécurisé du navigateur (IndexedDB)',
@@ -172,6 +210,13 @@ const browserApi = {
     return mutate(() => referentielService.startNewAnnee(data, userId(token)))
   },
   listClasses: async (anneeId?: number) => referentielService.listClasses(anneeId),
+  createClasse: async (
+    data: Parameters<typeof referentielService.createClasse>[0],
+    token: string
+  ) => {
+    requireDirector(token)
+    return mutate(() => referentielService.createClasse(data))
+  },
 
   listEleves: async (filters?: EleveFiltres) => elevesService.listEleves(filters),
   getEleve: async (id: number, anneeId?: number) => elevesService.getEleve(id, anneeId),
@@ -201,7 +246,10 @@ const browserApi = {
   getDashboardStats: async (anneeId?: number) => dashboardService.getDashboardStats(anneeId),
   rechercheGlobale: async (term: string, anneeId?: number) =>
     dashboardService.rechercheGlobale(term, anneeId),
-  seedDemo: async () => mutate(() => seedDemoData()),
+  seedDemo: async (token: string) => {
+    requireDirector(token)
+    return mutate(() => seedDemoData())
+  },
 
   listMatieres: async (sectionId: number) => scolariteService.listMatieres(sectionId),
   listPeriodes: async (anneeId: number, type?: 'sequence' | 'trimestre') =>
@@ -215,6 +263,7 @@ const browserApi = {
     notes: NoteInput[],
     token: string
   ) => {
+    requireAcademicAccess(token)
     await mutate(() =>
       scolariteService.saveNotes(classeId, periodeId, matiereId, notes, userId(token))
     )
@@ -229,15 +278,17 @@ const browserApi = {
     periodeId: number,
     appreciations: Record<number, string> | undefined,
     token: string
-  ) =>
-    mutate(() =>
+  ) => {
+    requireAcademicAccess(token)
+    return mutate(() =>
       scolariteService.genererBulletinsClasse(
         classeId,
         periodeId,
         appreciations,
         userId(token)
       )
-    ),
+    )
+  },
   getBulletinData: async (eleveId: number, periodeId: number) =>
     scolariteService.getBulletinData(eleveId, periodeId),
   listBulletinsClasse: async (classeId: number, periodeId: number) =>
@@ -249,6 +300,18 @@ const browserApi = {
   ) => {
     const data = scolariteService.getBulletinData(eleveId, periodeId)
     if (!data) return { success: false, error: 'Bulletin introuvable — saisissez les notes d’abord' }
+    if (!data.bulletin) {
+      return { success: false, error: 'Générez le bulletin avant de l’imprimer' }
+    }
+    if (
+      Math.abs(data.bulletin.moyenne_generale - data.moyenne.moyenne) > 0.001 ||
+      data.bulletin.rang !== data.moyenne.rang
+    ) {
+      return {
+        success: false,
+        error: 'Les notes ont changé. Régénérez le bulletin avant impression.'
+      }
+    }
     return handlePdf({ type: 'bulletin', data }, action, data.eleve.matricule)
   },
   exportPalmaresPdf: async (
@@ -326,13 +389,15 @@ const browserApi = {
   listImpayes: async (anneeId: number, classeId?: number) =>
     financesService.listImpayes(anneeId, classeId),
   listDepenses: async (anneeId: number) => financesService.listDepenses(anneeId),
-  createDepense: async (data: object, token: string) =>
-    mutate(() =>
+  createDepense: async (data: object, token: string) => {
+    requireFinanceAccess(token)
+    return mutate(() =>
       financesService.createDepense(
         data as Parameters<typeof financesService.createDepense>[0],
         userId(token)
       )
-    ),
+    )
+  },
   getBilanAnnuel: async (anneeId: number, token: string) => {
     requireFinanceAccess(token)
     return financesService.getBilanAnnuel(anneeId)
@@ -385,10 +450,14 @@ const browserApi = {
 
   getAdminDashboard: async (anneeId?: number) => adminService.getAdminDashboard(anneeId),
   listPersonnel: async (actifOnly?: boolean) => adminService.listPersonnel(actifOnly),
-  createPersonnel: async (data: PersonnelFormData, token: string) =>
-    mutate(() => adminService.createPersonnel(data, userId(token))),
-  updatePersonnel: async (id: number, data: Partial<PersonnelFormData>, token: string) =>
-    mutate(() => adminService.updatePersonnel(id, data, userId(token))),
+  createPersonnel: async (data: PersonnelFormData, token: string) => {
+    requireDirector(token)
+    return mutate(() => adminService.createPersonnel(data, userId(token)))
+  },
+  updatePersonnel: async (id: number, data: Partial<PersonnelFormData>, token: string) => {
+    requireDirector(token)
+    return mutate(() => adminService.updatePersonnel(id, data, userId(token)))
+  },
   listUtilisateurs: async (token: string) => {
     requireDirector(token)
     return adminService.listUtilisateurs()
@@ -416,7 +485,10 @@ const browserApi = {
     id: number,
     data: { nom?: string; capacite_max?: number },
     token: string
-  ) => mutate(() => adminService.updateClasse(id, data, userId(token))),
+  ) => {
+    requireDirector(token)
+    return mutate(() => adminService.updateClasse(id, data, userId(token)))
+  },
   getDemoStatus: async (token: string) => {
     requireDirector(token)
     return adminService.getDemoStatus()

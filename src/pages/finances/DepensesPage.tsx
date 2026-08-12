@@ -16,7 +16,7 @@ const TYPE_OPTIONS: { value: TypeDepense; label: string }[] = [
 ]
 
 export default function DepensesPage() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const { anneeActive } = useApp()
   const [depenses, setDepenses] = useState<Depense[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -60,6 +60,14 @@ export default function DepensesPage() {
   }
 
   const total = depenses.reduce((s, d) => s + d.montant, 0)
+
+  if (!['directrice', 'comptable'].includes(user?.role || '')) {
+    return (
+      <div className="card p-8 text-center text-red-600">
+        Accès réservé à la direction et à la comptabilité.
+      </div>
+    )
+  }
 
   return (
     <div>

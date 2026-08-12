@@ -42,12 +42,30 @@ export function getSession(token: string): AuthSession | null {
   return { utilisateur: user, token }
 }
 
+export function restoreSession(
+  token: string,
+  utilisateurId: number,
+  expiresAt: number
+): AuthSession | null {
+  if (!token || expiresAt < Date.now()) return null
+  const user = getDb()
+    .prepare('SELECT id, username, nom, prenom, role, actif, created_at FROM utilisateurs WHERE id = ?')
+    .get(utilisateurId) as Utilisateur | undefined
+  if (!user || !user.actif) return null
+  sessions.set(token, { utilisateurId, expiresAt })
+  return { utilisateur: user, token }
+}
+
 export function logout(token: string): void {
   const session = sessions.get(token)
   if (session) {
     logActivity(session.utilisateurId, 'deconnexion', 'utilisateur', session.utilisateurId)
   }
   sessions.delete(token)
+}
+
+export function clearSessions(): void {
+  sessions.clear()
 }
 
 export function getCurrentUserId(token: string): number | null {

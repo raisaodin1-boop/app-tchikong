@@ -33,7 +33,7 @@ const roleLabels: Record<string, string> = {
 }
 
 export default function Layout() {
-  const { user, logout } = useAuth()
+  const { user, token, logout } = useAuth()
   const { anneeActive } = useApp()
   const navigate = useNavigate()
   const [online, setOnline] = useState(navigator.onLine)
@@ -61,11 +61,12 @@ export default function Layout() {
   }
 
   const handleRestore = async () => {
+    if (!token || user?.role !== 'directrice') return
     if (!confirm('Restaurer une sauvegarde remplacera toutes les données actuelles. Continuer ?')) {
       return
     }
     try {
-      const result = await window.api.restoreDb()
+      const result = await window.api.restoreDb(token)
       if (result.success) {
         alert('Sauvegarde restaurée. L’application va redémarrer.')
         window.location.reload()
@@ -121,13 +122,15 @@ export default function Layout() {
             <Database className="h-4 w-4" />
             Sauvegarder
           </button>
-          <button
-            onClick={handleRestore}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-tchikong-100 hover:bg-white/10"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Restaurer
-          </button>
+          {user?.role === 'directrice' && (
+            <button
+              onClick={handleRestore}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-tchikong-100 hover:bg-white/10"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Restaurer
+            </button>
+          )}
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-tchikong-100 hover:bg-white/10"

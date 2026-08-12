@@ -176,6 +176,12 @@ export function createClasse(data: {
   capacite_max?: number
 }): Classe {
   const db = getDb()
+  const level = db
+    .prepare('SELECT id FROM niveaux WHERE id = ? AND section_id = ?')
+    .get(data.niveau_id, data.section_id)
+  if (!level) throw new Error('Le niveau ne correspond pas à la section sélectionnée')
+  const year = db.prepare('SELECT id FROM annees_scolaires WHERE id = ?').get(data.annee_scolaire_id)
+  if (!year) throw new Error('Année scolaire introuvable')
   const result = db
     .prepare(
       `INSERT INTO classes (annee_scolaire_id, niveau_id, section_id, nom, capacite_max)

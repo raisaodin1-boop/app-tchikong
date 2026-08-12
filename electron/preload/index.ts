@@ -37,8 +37,8 @@ const api = {
   // DB
   backupDb: (): Promise<{ success: boolean; path?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.DB_BACKUP),
-  restoreDb: (): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.DB_RESTORE),
+  restoreDb: (token: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DB_RESTORE, token),
   getDbPath: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.DB_GET_PATH),
 
   // Référentiel
@@ -55,6 +55,16 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.ANNEE_START, data, token),
   listClasses: (anneeId?: number): Promise<Classe[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.CLASSE_LIST, anneeId),
+  createClasse: (
+    data: {
+      annee_scolaire_id: number
+      niveau_id: number
+      section_id: number
+      nom: string
+      capacite_max?: number
+    },
+    token: string
+  ): Promise<Classe> => ipcRenderer.invoke(IPC_CHANNELS.CLASSE_CREATE, data, token),
 
   // Élèves
   listEleves: (filtres?: EleveFiltres): Promise<Inscription[]> =>
@@ -87,8 +97,8 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.RECHERCHE_GLOBALE, term, anneeId),
 
   // Seed
-  seedDemo: (): Promise<{ message: string; count: number }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.SEED_DEMO),
+  seedDemo: (token: string): Promise<{ message: string; count: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SEED_DEMO, token),
 
   // Scolarité
   listMatieres: (sectionId: number): Promise<Matiere[]> =>

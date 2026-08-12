@@ -42,7 +42,7 @@ export interface SituationFinanciere {
   total_du: number
   total_paye: number
   reste: number
-  statut: 'a_jour' | 'partiel' | 'impaye'
+  statut: 'a_jour' | 'partiel' | 'impaye' | 'non_configure'
   details: {
     frais_modele_id: number
     type_frais: TypeFrais
@@ -112,9 +112,11 @@ export { TYPE_FRAIS_LABELS, MODE_PAIEMENT_LABELS }
 
 function generateNumeroRecu(): string {
   const year = new Date().getFullYear()
-  const count =
-    (getDb().prepare('SELECT COUNT(*) as c FROM paiements').get() as { c: number }).c + 1
-  return `REC-${year}-${String(count).padStart(5, '0')}`
+  const nextId =
+    (getDb().prepare('SELECT COALESCE(MAX(id), 0) + 1 as id FROM paiements').get() as {
+      id: number
+    }).id
+  return `REC-${year}-${String(nextId).padStart(5, '0')}`
 }
 
 export function listFraisConfigurations(anneeScolaireId: number): FraisConfiguration[] {
@@ -329,10 +331,15 @@ export function getSituationFinanciere(
       .map((paiement) => [paiement.type_frais, paiement.total])
   )
 
+  const legacyTypesApplied = new Set<TypeFrais>()
   const details = frais.map((item) => {
+    const legacyAmount = legacyTypesApplied.has(item.type_frais)
+      ? 0
+      : paiementsLegacy.get(item.type_frais) || 0
+    if (legacyAmount > 0) legacyTypesApplied.add(item.type_frais)
     const paye =
       (paiementsParModele.get(item.frais_modele_id) || 0) +
-      (paiementsLegacy.get(item.type_frais) || 0)
+      legacyAmount
     return {
       frais_modele_id: item.frais_modele_id,
       type_frais: item.type_frais,
@@ -347,7 +354,7 @@ export function getSituationFinanciere(
   const total_paye = details.reduce((s, d) => s + d.montant_paye, 0)
   const reste = Math.max(0, total_du - total_paye)
 
-  let statut: SituationFinanciere['statut'] = 'a_jour'
+  let statut: SituationFinanciere['statut'] = details.length === 0 ? 'non_configure' : 'a_jour'
   if (reste > 0 && total_paye > 0) statut = 'partiel'
   if (reste > 0 && total_paye === 0) statut = 'impaye'
 

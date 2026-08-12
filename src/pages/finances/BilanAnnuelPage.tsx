@@ -306,14 +306,18 @@ export default function BilanAnnuelPage() {
                                   ? 'badge-green'
                                   : student.statut === 'partiel'
                                     ? 'badge-yellow'
-                                    : 'badge-red'
+                                    : student.statut === 'non_configure'
+                                      ? 'badge-gray'
+                                      : 'badge-red'
                               }
                             >
                               {student.statut === 'a_jour'
                                 ? 'À jour'
                                 : student.statut === 'partiel'
                                   ? 'Partiel'
-                                  : 'Impayé'}
+                                  : student.statut === 'non_configure'
+                                    ? 'À configurer'
+                                    : 'Impayé'}
                             </span>
                           </td>
                         </tr>

@@ -251,11 +251,11 @@ export default function EleveFormPage() {
               </select>
             </div>
             <div>
-              <label className="label">Niveau</label>
+              <label className="label">Niveau (déterminé par la classe)</label>
               <select
                 className="input"
                 value={form.niveau_id}
-                onChange={(e) => setForm({ ...form, niveau_id: Number(e.target.value) })}
+                disabled
               >
                 {filteredNiveaux.map((n) => (
                   <option key={n.id} value={n.id}>

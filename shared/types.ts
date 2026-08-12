@@ -414,7 +414,13 @@ export interface NoteInput {
 }
 
 export interface NotesGrid {
-  classe: { id: number; nom: string; section_id: number; section_code: string }
+  classe: {
+    id: number
+    nom: string
+    section_id: number
+    section_code: string
+    annee_scolaire_id: number
+  }
   periode: PeriodeEvaluation
   matieres: Matiere[]
   eleves: { eleve_id: number; nom: string; prenom: string; matricule: string }[]
@@ -469,7 +475,7 @@ export interface SituationFinanciere {
   total_du: number
   total_paye: number
   reste: number
-  statut: 'a_jour' | 'partiel' | 'impaye'
+  statut: 'a_jour' | 'partiel' | 'impaye' | 'non_configure'
   details: {
     frais_modele_id: number
     type_frais: TypeFrais
@@ -577,7 +583,7 @@ export interface BilanEleve {
   montant_attendu: number
   montant_percu: number
   montant_non_percu: number
-  statut: 'a_jour' | 'partiel' | 'impaye'
+  statut: 'a_jour' | 'partiel' | 'impaye' | 'non_configure'
 }
 
 export interface BilanAnnuel {
@@ -703,7 +709,7 @@ export interface DashboardStats {
     montant_impayes: number
   }
   alertes: {
-    type: 'impaye' | 'absence' | 'surcharge'
+    type: 'impaye' | 'absence' | 'surcharge' | 'configuration'
     message: string
     count?: number
   }[]

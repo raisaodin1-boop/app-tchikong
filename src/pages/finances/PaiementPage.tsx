@@ -164,10 +164,12 @@ export default function PaiementPage() {
             Situation de {situation.prenom} {situation.nom}
             <span className={`ml-2 badge ${
               situation.statut === 'a_jour' ? 'badge-green' :
-              situation.statut === 'partiel' ? 'badge-yellow' : 'badge-red'
+              situation.statut === 'partiel' ? 'badge-yellow' :
+              situation.statut === 'non_configure' ? 'badge-gray' : 'badge-red'
             }`}>
               {situation.statut === 'a_jour' ? 'À jour' :
-               situation.statut === 'partiel' ? 'Paiement partiel' : 'Impayé'}
+               situation.statut === 'partiel' ? 'Paiement partiel' :
+               situation.statut === 'non_configure' ? 'Frais non configurés' : 'Impayé'}
             </span>
           </h3>
           <div className="grid grid-cols-3 gap-3 mb-4">

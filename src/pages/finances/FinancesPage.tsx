@@ -7,7 +7,7 @@ const tabs = [
   { to: '/finances/paiement', icon: CreditCard, label: 'Nouveau paiement' },
   { to: '/finances/historique', icon: History, label: 'Historique' },
   { to: '/finances/impayes', icon: AlertCircle, label: 'Impayés' },
-  { to: '/finances/depenses', icon: Receipt, label: 'Dépenses' },
+  { to: '/finances/depenses', icon: Receipt, label: 'Dépenses', financeOnly: true },
   { to: '/finances/bilan', icon: BarChart3, label: 'Bilan annuel', financeOnly: true }
 ]
 

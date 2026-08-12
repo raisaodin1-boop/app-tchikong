@@ -64,43 +64,29 @@ export default function BulletinsPage() {
       >
     ])
 
-    if (bulletins.length > 0) {
-      setAppreciations(
-        Object.fromEntries(
-          bulletins.map((bulletin) => [
-            bulletin.eleve_id,
-            bulletin.appreciation_maitre || ''
-          ])
-        )
+    const bulletinByStudent = new Map(bulletins.map((bulletin) => [bulletin.eleve_id, bulletin]))
+    setAppreciations(
+      Object.fromEntries(
+        bulletins.map((bulletin) => [bulletin.eleve_id, bulletin.appreciation_maitre || ''])
       )
-      setRows(
-        bulletins.map((b) => ({
-          eleve_id: b.eleve_id,
-          nom: b.nom,
-          prenom: b.prenom,
-          matricule: b.matricule,
-          moyenne: b.moyenne_generale,
-          rang: b.rang,
-          mention: b.mention,
-          appreciation: b.appreciation_maitre || ''
-        }))
-      )
-    } else {
-      setRows(
-        moyennes
-          .filter((m) => m.details.length > 0)
-          .map((m) => ({
+    )
+    setRows(
+      moyennes
+        .filter((m) => m.details.length > 0)
+        .map((m) => {
+          const bulletin = bulletinByStudent.get(m.eleve_id)
+          return {
             eleve_id: m.eleve_id,
             nom: m.nom,
             prenom: m.prenom,
             matricule: m.matricule,
-            moyenne: m.moyenne,
-            rang: m.rang,
-            mention: m.mention,
-            appreciation: ''
-          }))
-      )
-    }
+            moyenne: bulletin?.moyenne_generale ?? m.moyenne,
+            rang: bulletin?.rang ?? m.rang,
+            mention: bulletin?.mention ?? m.mention,
+            appreciation: bulletin?.appreciation_maitre || ''
+          }
+        })
+    )
   }
 
   useEffect(() => {

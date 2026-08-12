@@ -16,6 +16,57 @@ function generateMatricule(): string {
   return `TCH-${year}-${String(count).padStart(4, '0')}`
 }
 
+function validateEnrollmentClass(anneeId: number, classeId: number): {
+  id: number
+  section_id: number
+  niveau_id: number
+} {
+  const db = getDb()
+  const classe = db
+    .prepare(
+      `SELECT id, section_id, niveau_id FROM classes
+       WHERE id = ? AND annee_scolaire_id = ?`
+    )
+    .get(classeId, anneeId) as
+    | { id: number; section_id: number; niveau_id: number }
+    | undefined
+  if (!classe) throw new Error("La classe ne correspond pas à l'année scolaire sélectionnée")
+
+  const requiredFees = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as count FROM frais_modeles
+         WHERE annee_scolaire_id = ? AND obligatoire = 1`
+      )
+      .get(anneeId) as { count: number }
+  ).count
+  if (requiredFees === 0) {
+    throw new Error(
+      "Configurez d'abord les frais scolaires obligatoires de cette année avant d'inscrire des élèves"
+    )
+  }
+  const applicableFees = (
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT f.id) as count
+         FROM frais_modeles f
+         JOIN frais_montants m ON m.frais_modele_id = f.id
+         WHERE f.annee_scolaire_id = ? AND f.obligatoire = 1
+           AND (
+             (f.mode_tarification = 'unique' AND m.classe_id IS NULL)
+             OR (f.mode_tarification = 'par_classe' AND m.classe_id = ?)
+           )`
+      )
+      .get(anneeId, classeId) as { count: number }
+  ).count
+  if (applicableFees !== requiredFees) {
+    throw new Error(
+      'Les montants de tous les frais obligatoires doivent être définis pour cette classe'
+    )
+  }
+  return classe
+}
+
 export function listEleves(filtres: EleveFiltres = {}): Inscription[] {
   let sql = `
     SELECT i.*, e.matricule, e.nom, e.prenom, e.date_naissance, e.sexe, e.photo_path, e.adresse,
@@ -105,6 +156,7 @@ export function getEleve(id: number, anneeScolaireId?: number): {
 export function createEleve(data: EleveFormData, userId?: number): Eleve {
   const db = getDb()
   const matricule = data.matricule || generateMatricule()
+  const classe = validateEnrollmentClass(data.annee_scolaire_id, data.classe_id)
 
   const transaction = db.transaction(() => {
     const result = db
@@ -131,8 +183,8 @@ export function createEleve(data: EleveFormData, userId?: number): Eleve {
       eleveId,
       data.annee_scolaire_id,
       data.classe_id,
-      data.section_id,
-      data.niveau_id,
+      classe.section_id,
+      classe.niveau_id,
       data.redoublement ? 1 : 0
     )
 
@@ -187,13 +239,14 @@ export function updateEleve(
     }
 
     if (data.classe_id && data.annee_scolaire_id) {
+      const classe = validateEnrollmentClass(data.annee_scolaire_id, data.classe_id)
       db.prepare(
         `UPDATE inscriptions SET classe_id = ?, section_id = ?, niveau_id = ?, redoublement = ?
          WHERE eleve_id = ? AND annee_scolaire_id = ?`
       ).run(
         data.classe_id,
-        data.section_id,
-        data.niveau_id,
+        classe.section_id,
+        classe.niveau_id,
         data.redoublement ? 1 : 0,
         id,
         data.annee_scolaire_id
