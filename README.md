@@ -23,7 +23,7 @@ Application desktop de gestion scolaire pour le **Groupe Scolaire Bilingue Prima
 | Démarrage d'année et modules de frais configurables par la directrice | ✅ |
 | Paie mensuelle du personnel avec validation et journal automatique | ✅ |
 | Bilan annuel par classe et par élève, exportable vers Excel | ✅ |
-| Bulletins premium avec statistiques de classe et QR d'authenticité | ✅ |
+| Bulletins premium avec statistiques de classe et QR de contrôle | ✅ |
 
 ## Deux modes entièrement hors connexion
 

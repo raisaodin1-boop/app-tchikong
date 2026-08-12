@@ -150,7 +150,7 @@ export default function BulletinsPage() {
             </p>
             <h2 className="text-2xl font-bold">Studio des bulletins</h2>
             <p className="mt-1 text-sm text-blue-100">
-              Classement, statistiques comparatives, appréciations et QR d’authenticité
+              Classement, statistiques comparatives, appréciations et QR de contrôle
             </p>
           </div>
         </div>

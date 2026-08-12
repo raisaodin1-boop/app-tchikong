@@ -389,9 +389,9 @@ export class PdfBuilder {
     const x = A4.width - MARGINS.right - size
     const y = this.y - size + 5
     this.page.drawImage(image, { x, y, width: size, height: size })
-    this.drawText('AUTHENTICITÉ DU BULLETIN', MARGINS.left, this.y - 10, 8, true, COLORS.primary)
+    this.drawText('CONTRÔLE DU BULLETIN', MARGINS.left, this.y - 10, 8, true, COLORS.primary)
     this.drawText(
-      `Référence sécurisée : ${verificationCode}`,
+      `Référence de contrôle : ${verificationCode}`,
       MARGINS.left,
       this.y - 26,
       8,
@@ -399,7 +399,7 @@ export class PdfBuilder {
       COLORS.textMuted
     )
     this.drawText(
-      'Le QR code contient le matricule, la période et le résultat signé localement.',
+      'Le QR code contient le matricule, la période et les résultats de contrôle.',
       MARGINS.left,
       this.y - 40,
       7,
