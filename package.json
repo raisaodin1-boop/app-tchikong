@@ -14,7 +14,7 @@
     "preview": "electron-vite preview",
     "postinstall": "electron-builder install-app-deps",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder --publish never"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
@@ -55,6 +55,7 @@
     ],
     "win": {
       "target": "nsis"
-    }
+    },
+    "publish": null
   }
 }
