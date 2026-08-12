@@ -174,11 +174,14 @@ const browserApi = {
   },
   listHistorique: async (eleveId: number) =>
     elevesService.getEleve(eleveId)?.historique ?? [],
-  addHistorique: async (
-    eleveId: number,
-    data: Parameters<typeof elevesService.addHistorique>[1],
-    token: string
-  ) => mutate(() => elevesService.addHistorique(eleveId, data, userId(token))),
+  addHistorique: async (eleveId: number, data: object, token: string) =>
+    mutate(() =>
+      elevesService.addHistorique(
+        eleveId,
+        data as Parameters<typeof elevesService.addHistorique>[1],
+        userId(token)
+      )
+    ),
 
   getDashboardStats: async (anneeId?: number) => dashboardService.getDashboardStats(anneeId),
   rechercheGlobale: async (term: string, anneeId?: number) =>
@@ -297,10 +300,13 @@ const browserApi = {
   listImpayes: async (anneeId: number, classeId?: number) =>
     financesService.listImpayes(anneeId, classeId),
   listDepenses: async (anneeId: number) => financesService.listDepenses(anneeId),
-  createDepense: async (
-    data: Parameters<typeof financesService.createDepense>[0],
-    token: string
-  ) => mutate(() => financesService.createDepense(data, userId(token))),
+  createDepense: async (data: object, token: string) =>
+    mutate(() =>
+      financesService.createDepense(
+        data as Parameters<typeof financesService.createDepense>[0],
+        userId(token)
+      )
+    ),
   exportRecuPdf: async (paiementId: number, action: 'save' | 'print' = 'save') => {
     const data = financesService.getRecuData(paiementId)
     if (!data) return { success: false, error: 'Paiement introuvable' }

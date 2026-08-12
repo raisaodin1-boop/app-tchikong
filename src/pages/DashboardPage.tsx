@@ -149,9 +149,9 @@ export default function DashboardPage() {
               <h2 className="text-lg font-semibold mb-4">Effectifs par niveau</h2>
               {stats.effectifs.par_niveau.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2">
-                  {stats.effectifs.par_niveau.map((n) => (
+                  {stats.effectifs.par_niveau.map((n, index) => (
                     <div
-                      key={n.niveau}
+                      key={`${n.niveau}-${index}`}
                       className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
                     >
                       <span className="text-sm text-gray-600">{n.niveau}</span>

@@ -3,12 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
-import type { EleveFormData, LienParente, Sexe } from '@shared/types'
+import type { EleveFormData, LienParente, ParentTuteur, Sexe } from '@shared/types'
 
 const emptyParent = {
   nom: '',
   prenom: '',
   telephone: '',
+  telephone_secondaire: '',
   profession: '',
   lien_parente: 'pere' as LienParente,
   contact_urgence: false,
@@ -53,10 +54,11 @@ export default function EleveFormPage() {
             redoublement: Boolean(data.inscription?.redoublement),
             parents:
               data.parents.length > 0
-                ? data.parents.map((p) => ({
+                ? data.parents.map((p: ParentTuteur) => ({
                     nom: p.nom,
                     prenom: p.prenom || '',
                     telephone: p.telephone,
+                    telephone_secondaire: p.telephone_secondaire || '',
                     profession: p.profession || '',
                     lien_parente: p.lien_parente,
                     contact_urgence: p.contact_urgence,
@@ -113,6 +115,7 @@ export default function EleveFormPage() {
           nom: p.nom,
           prenom: p.prenom || null,
           telephone: p.telephone,
+          telephone_secondaire: p.telephone_secondaire || null,
           profession: p.profession || null,
           lien_parente: p.lien_parente,
           contact_urgence: p.contact_urgence,

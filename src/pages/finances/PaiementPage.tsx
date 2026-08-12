@@ -63,7 +63,9 @@ export default function PaiementPage() {
       const sit = await window.api.getSituationFinanciere(eleve.eleve_id, anneeActive.id)
       setSituation(sit)
       if (sit) {
-        const detail = sit.details.find((d) => d.type_frais === 'scolarite')
+        const detail = sit.details.find(
+          (d: SituationFinanciere['details'][number]) => d.type_frais === 'scolarite'
+        )
         if (detail && detail.reste > 0) {
           setForm((f) => ({ ...f, type_frais: 'scolarite', montant: String(detail.reste) }))
         }

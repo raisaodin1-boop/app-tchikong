@@ -176,7 +176,6 @@ export function calculerMention(moyenne: number): MentionBulletin {
 }
 
 export function calculerMoyennesClasse(classeId: number, periodeId: number): EleveMoyenne[] {
-  const db = getDb()
   const grid = getNotesGrid(classeId, periodeId)
   if (!grid) return []
 
