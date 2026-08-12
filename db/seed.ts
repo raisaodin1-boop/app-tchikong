@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { getDb } from './database'
+import { getDb } from '@database'
 import type { SectionCode } from '../shared/types'
 
 export function seedReferenceData(): void {

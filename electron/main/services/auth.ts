@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
-import { getDb, logActivity } from '../../../db/database'
+import { getDb, logActivity } from '@database'
 import type { AuthSession, LoginRequest, Utilisateur } from '../../shared/types'
 
 const sessions = new Map<string, { utilisateurId: number; expiresAt: number }>()

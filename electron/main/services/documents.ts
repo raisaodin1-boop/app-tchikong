@@ -1,4 +1,4 @@
-import { getDb, logActivity } from '../../../db/database'
+import { getDb, logActivity } from '@database'
 import type { TypeDocumentOfficiel } from '../../../shared/types'
 
 export interface AttestationData {

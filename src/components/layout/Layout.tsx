@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
   Users,
@@ -8,7 +9,9 @@ import {
   LogOut,
   ClipboardCheck,
   GraduationCap,
-  Database
+  Database,
+  RotateCcw,
+  WifiOff
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
@@ -33,6 +36,17 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const { anneeActive } = useApp()
   const navigate = useNavigate()
+  const [online, setOnline] = useState(navigator.onLine)
+
+  useEffect(() => {
+    const updateStatus = () => setOnline(navigator.onLine)
+    window.addEventListener('online', updateStatus)
+    window.addEventListener('offline', updateStatus)
+    return () => {
+      window.removeEventListener('online', updateStatus)
+      window.removeEventListener('offline', updateStatus)
+    }
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -43,6 +57,21 @@ export default function Layout() {
     const result = await window.api.backupDb()
     if (result.success) {
       alert(`Sauvegarde effectuée : ${result.path}`)
+    }
+  }
+
+  const handleRestore = async () => {
+    if (!confirm('Restaurer une sauvegarde remplacera toutes les données actuelles. Continuer ?')) {
+      return
+    }
+    try {
+      const result = await window.api.restoreDb()
+      if (result.success) {
+        alert('Sauvegarde restaurée. L’application va redémarrer.')
+        window.location.reload()
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'La restauration a échoué')
     }
   }
 
@@ -93,6 +122,13 @@ export default function Layout() {
             Sauvegarder
           </button>
           <button
+            onClick={handleRestore}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-tchikong-100 hover:bg-white/10"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Restaurer
+          </button>
+          <button
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-tchikong-100 hover:bg-white/10"
           >
@@ -105,6 +141,15 @@ export default function Layout() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex items-center gap-4 border-b border-gray-200 bg-white px-6 py-3">
           <GlobalSearch />
+          <div
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+              online ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-800'
+            }`}
+            title="Les données restent enregistrées uniquement sur cet appareil"
+          >
+            {!online && <WifiOff className="h-3.5 w-3.5" />}
+            {online ? 'Données locales' : 'Hors connexion'}
+          </div>
           <div className="ml-auto text-right">
             <p className="text-sm font-medium text-gray-900">
               {user?.prenom} {user?.nom}

@@ -1,5 +1,5 @@
 import * as financesService from '../services/finances'
-import { getDb } from '../../../db/database'
+import { getDb } from '@database'
 import type { DashboardStats, RechercheResultat } from '../../../shared/types'
 
 export function getDashboardStats(anneeScolaireId?: number): DashboardStats {

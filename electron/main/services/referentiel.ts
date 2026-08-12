@@ -1,4 +1,4 @@
-import { getDb } from '../../../db/database'
+import { getDb } from '@database'
 import type {
   AnneeScolaire,
   Classe,

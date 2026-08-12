@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { getDb, logActivity } from '../../../db/database'
+import { getDb, logActivity } from '@database'
 import type {
   Classe,
   DocumentOfficiel,
