@@ -2,8 +2,10 @@ import { getDb, logActivity } from '@database'
 import type {
   Depense,
   GrilleTarifaire,
+  GrilleTarifaireDetail,
   ModePaiement,
   Paiement,
+  TarifFormData,
   TypeDepense,
   TypeFrais
 } from '../../../shared/types'
@@ -113,7 +115,7 @@ function generateNumeroRecu(): string {
   return `REC-${year}-${String(count).padStart(5, '0')}`
 }
 
-export function listGrilleTarifaire(anneeScolaireId: number): GrilleTarifaire[] {
+export function listGrilleTarifaire(anneeScolaireId: number): GrilleTarifaireDetail[] {
   return getDb()
     .prepare(
       `SELECT g.*, n.nom as niveau_nom, s.code as section_code
@@ -123,7 +125,91 @@ export function listGrilleTarifaire(anneeScolaireId: number): GrilleTarifaire[] 
        WHERE g.annee_scolaire_id = ?
        ORDER BY s.code, n.ordre, g.type_frais`
     )
-    .all(anneeScolaireId) as GrilleTarifaire[]
+    .all(anneeScolaireId) as GrilleTarifaireDetail[]
+}
+
+export function upsertTarif(data: TarifFormData, userId?: number): GrilleTarifaireDetail {
+  if (!data.libelle.trim()) throw new Error('Le libellé du frais est requis')
+  if (!Number.isFinite(data.montant) || data.montant <= 0) {
+    throw new Error('Le montant doit être supérieur à zéro')
+  }
+
+  const db = getDb()
+  const niveau = db
+    .prepare('SELECT id FROM niveaux WHERE id = ? AND section_id = ?')
+    .get(data.niveau_id, data.section_id)
+  if (!niveau) throw new Error('Le niveau ne correspond pas à la section sélectionnée')
+
+  db.prepare(
+    `INSERT INTO grille_tarifaire
+      (annee_scolaire_id, niveau_id, section_id, type_frais, libelle, montant)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(annee_scolaire_id, niveau_id, section_id, type_frais)
+     DO UPDATE SET libelle = excluded.libelle, montant = excluded.montant`
+  ).run(
+    data.annee_scolaire_id,
+    data.niveau_id,
+    data.section_id,
+    data.type_frais,
+    data.libelle.trim(),
+    data.montant
+  )
+
+  const tarif = db
+    .prepare(
+      `SELECT g.*, n.nom as niveau_nom, s.code as section_code
+       FROM grille_tarifaire g
+       JOIN niveaux n ON n.id = g.niveau_id
+       JOIN sections s ON s.id = g.section_id
+       WHERE g.annee_scolaire_id = ? AND g.niveau_id = ?
+         AND g.section_id = ? AND g.type_frais = ?`
+    )
+    .get(
+      data.annee_scolaire_id,
+      data.niveau_id,
+      data.section_id,
+      data.type_frais
+    ) as GrilleTarifaireDetail
+
+  logActivity(
+    userId ?? null,
+    'configuration',
+    'tarif',
+    tarif.id,
+    `${tarif.libelle}: ${tarif.montant}`
+  )
+  return tarif
+}
+
+export function deleteTarif(id: number, userId?: number): boolean {
+  const db = getDb()
+  const tarif = db.prepare('SELECT * FROM grille_tarifaire WHERE id = ?').get(id) as
+    | GrilleTarifaire
+    | undefined
+  if (!tarif) throw new Error('Frais introuvable')
+
+  const payment = db
+    .prepare(
+      `SELECT 1 FROM paiements p
+       JOIN inscriptions i ON i.eleve_id = p.eleve_id
+         AND i.annee_scolaire_id = p.annee_scolaire_id
+       WHERE p.annee_scolaire_id = ? AND p.type_frais = ?
+         AND i.niveau_id = ? AND i.section_id = ?
+       LIMIT 1`
+    )
+    .get(
+      tarif.annee_scolaire_id,
+      tarif.type_frais,
+      tarif.niveau_id,
+      tarif.section_id
+    )
+  if (payment) {
+    throw new Error('Ce frais possède déjà des paiements et ne peut pas être supprimé')
+  }
+
+  db.prepare('DELETE FROM grille_tarifaire WHERE id = ?').run(id)
+  logActivity(userId ?? null, 'suppression', 'tarif', id, tarif.libelle)
+  return true
 }
 
 export function getSituationFinanciere(

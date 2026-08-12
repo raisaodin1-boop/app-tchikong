@@ -21,6 +21,7 @@ import AdminPage from './pages/admin/AdminPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import PersonnelPage from './pages/admin/PersonnelPage'
 import ClassesPage from './pages/admin/ClassesPage'
+import FraisScolairesPage from './pages/admin/FraisScolairesPage'
 import UtilisateursPage from './pages/admin/UtilisateursPage'
 import DocumentsPage from './pages/admin/DocumentsPage'
 import JournalPage from './pages/admin/JournalPage'
@@ -30,6 +31,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth()
   if (loading) return <LoadingScreen />
   if (!session) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
+
+function DirectriceRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (user?.role !== 'directrice') return <Navigate to="/" replace />
   return <>{children}</>
 }
 
@@ -75,6 +83,14 @@ export default function App() {
           <Route index element={<AdminDashboardPage />} />
           <Route path="personnel" element={<PersonnelPage />} />
           <Route path="classes" element={<ClassesPage />} />
+          <Route
+            path="frais"
+            element={
+              <DirectriceRoute>
+                <FraisScolairesPage />
+              </DirectriceRoute>
+            }
+          />
           <Route path="utilisateurs" element={<UtilisateursPage />} />
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="journal" element={<JournalPage />} />

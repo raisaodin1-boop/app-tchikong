@@ -254,6 +254,20 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE, (_, anneeId) =>
     financesService.listGrilleTarifaire(anneeId)
   )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE_UPSERT, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return financesService.upsertTarif(data, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE_DELETE, (_, id, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return financesService.deleteTarif(id, session.utilisateur.id)
+  })
   ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, (_, data, token) => {
     const userId = authService.getCurrentUserId(token)
     return financesService.createPaiement(data, userId ?? undefined)
@@ -343,4 +357,21 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ADMIN_JOURNAL_LIST, (_, filtres) =>
     adminService.listJournal(filtres)
   )
+  ipcMain.handle(IPC_CHANNELS.ADMIN_DEMO_STATUS, (_, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return adminService.getDemoStatus()
+  })
+  ipcMain.handle(IPC_CHANNELS.ADMIN_DEMO_EXIT, (_, confirmation, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    if (confirmation !== 'QUITTER DEMO') {
+      throw new Error('Confirmation incorrecte')
+    }
+    return adminService.exitDemoMode(session.utilisateur.id)
+  })
 }

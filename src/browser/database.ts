@@ -1,6 +1,7 @@
 import initSqlJs, { type BindParams, type Database, type SqlJsStatic } from 'sql.js'
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 import migrationSql from '../../db/migrations/001_initial_schema.sql?raw'
+import settingsMigrationSql from '../../db/migrations/002_app_settings.sql?raw'
 
 const STORAGE_DB = 'tchikong-offline-storage'
 const STORAGE_VERSION = 1
@@ -148,6 +149,7 @@ export async function initBrowserDatabase(): Promise<void> {
   database = stored ? new SQL.Database(stored) : new SQL.Database()
   database.run('PRAGMA foreign_keys = ON')
   database.exec(migrationSql)
+  database.exec(settingsMigrationSql)
   dirty = !stored
 
   if (navigator.storage?.persist) {
@@ -183,6 +185,7 @@ export async function importDatabase(bytes: Uint8Array): Promise<void> {
     throw new Error('La sauvegarde SQLite est endommagée')
   }
   replacement.exec(migrationSql)
+  replacement.exec(settingsMigrationSql)
   database?.close()
   database = replacement
   dirty = true

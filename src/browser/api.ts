@@ -294,6 +294,14 @@ const browserApi = {
     financesService.getSituationFinanciere(eleveId, anneeId),
   listGrilleTarifaire: async (anneeId: number) =>
     financesService.listGrilleTarifaire(anneeId),
+  upsertTarif: async (data: import('../../shared/types').TarifFormData, token: string) => {
+    requireDirector(token)
+    return mutate(() => financesService.upsertTarif(data, userId(token)))
+  },
+  deleteTarif: async (id: number, token: string) => {
+    requireDirector(token)
+    return mutate(() => financesService.deleteTarif(id, userId(token)))
+  },
   createPaiement: async (data: PaiementFormData, token: string) =>
     mutate(() => financesService.createPaiement(data, userId(token))),
   listPaiements: async (filters?: PaiementFiltres) => financesService.listPaiements(filters),
@@ -359,7 +367,16 @@ const browserApi = {
     id: number,
     data: { nom?: string; capacite_max?: number },
     token: string
-  ) => mutate(() => adminService.updateClasse(id, data, userId(token)))
+  ) => mutate(() => adminService.updateClasse(id, data, userId(token))),
+  getDemoStatus: async (token: string) => {
+    requireDirector(token)
+    return adminService.getDemoStatus()
+  },
+  exitDemoMode: async (confirmation: string, token: string) => {
+    requireDirector(token)
+    if (confirmation !== 'QUITTER DEMO') throw new Error('Confirmation incorrecte')
+    return mutate(() => adminService.exitDemoMode(userId(token)))
+  }
 }
 
 export async function installBrowserApi(): Promise<void> {

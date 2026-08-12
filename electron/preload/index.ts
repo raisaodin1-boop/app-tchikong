@@ -159,6 +159,10 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_SITUATION, eleveId, anneeId),
   listGrilleTarifaire: (anneeId: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE, anneeId),
+  upsertTarif: (data: import('../../shared/types').TarifFormData, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE_UPSERT, data, token),
+  deleteTarif: (id: number, token: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE_DELETE, id, token),
   createPaiement: (data: import('../../shared/types').PaiementFormData, token: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, data, token),
   listPaiements: (filtres?: import('../../shared/types').PaiementFiltres) =>
@@ -196,7 +200,14 @@ const api = {
   listJournal: (filtres?: import('../../shared/types').JournalFiltres) =>
     ipcRenderer.invoke(IPC_CHANNELS.ADMIN_JOURNAL_LIST, filtres),
   updateClasse: (id: number, data: { nom?: string; capacite_max?: number }, token: string) =>
-    ipcRenderer.invoke(IPC_CHANNELS.CLASSE_UPDATE, id, data, token)
+    ipcRenderer.invoke(IPC_CHANNELS.CLASSE_UPDATE, id, data, token),
+  getDemoStatus: (token: string): Promise<import('../../shared/types').DemoStatus> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_DEMO_STATUS, token),
+  exitDemoMode: (
+    confirmation: string,
+    token: string
+  ): Promise<import('../../shared/types').DemoResetResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_DEMO_EXIT, confirmation, token)
 }
 
 contextBridge.exposeInMainWorld('api', api)

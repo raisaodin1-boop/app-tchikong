@@ -515,6 +515,34 @@ export interface PaiementFiltres {
   recherche?: string
 }
 
+export interface TarifFormData {
+  annee_scolaire_id: number
+  niveau_id: number
+  section_id: number
+  type_frais: TypeFrais
+  libelle: string
+  montant: number
+}
+
+export interface GrilleTarifaireDetail extends GrilleTarifaire {
+  niveau_nom: string
+  section_code: string
+}
+
+export interface DemoStatus {
+  active: boolean
+  eleves: number
+}
+
+export interface DemoResetResult {
+  success: boolean
+  deleted: {
+    eleves: number
+    paiements: number
+    personnel: number
+  }
+}
+
 // --- Dashboard ---
 
 export interface DashboardStats {
@@ -693,6 +721,8 @@ export const IPC_CHANNELS = {
   FINANCES_DASHBOARD: 'finances:dashboard',
   FINANCES_SITUATION: 'finances:situation',
   FINANCES_GRILLE: 'finances:grille',
+  FINANCES_GRILLE_UPSERT: 'finances:grilleUpsert',
+  FINANCES_GRILLE_DELETE: 'finances:grilleDelete',
   FINANCES_PAIEMENT_CREATE: 'finances:paiementCreate',
   FINANCES_PAIEMENT_LIST: 'finances:paiementList',
   FINANCES_IMPAYES: 'finances:impayes',
@@ -711,5 +741,7 @@ export const IPC_CHANNELS = {
   ADMIN_UTILISATEUR_UPDATE: 'admin:utilisateurUpdate',
   ADMIN_UTILISATEUR_RESET_PASSWORD: 'admin:utilisateurResetPassword',
   ADMIN_DOCUMENT_LIST: 'admin:documentList',
-  ADMIN_JOURNAL_LIST: 'admin:journalList'
+  ADMIN_JOURNAL_LIST: 'admin:journalList',
+  ADMIN_DEMO_STATUS: 'admin:demoStatus',
+  ADMIN_DEMO_EXIT: 'admin:demoExit'
 } as const

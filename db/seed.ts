@@ -100,6 +100,7 @@ export function seedDemoData(): { message: string; count: number } {
     const notesResult = seedNotesDemo()
     const paymentsResult = seedPaymentsDemo()
     const personnelResult = seedPersonnelDemo()
+    setDemoMode(true)
     return {
       message: `Données déjà présentes (${existing.c} élèves). ${notesResult.message}. ${paymentsResult.message}. ${personnelResult.message}`,
       count: existing.c
@@ -269,8 +270,19 @@ export function seedDemoData(): { message: string; count: number } {
   seedNotesDemo(anneeId)
   seedPaymentsDemo(anneeId)
   seedPersonnelDemo()
+  setDemoMode(true)
 
   return { message: `${count} élèves de démonstration créés`, count }
+}
+
+function setDemoMode(active: boolean): void {
+  getDb()
+    .prepare(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES ('demo_mode', ?, datetime('now'))
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+    )
+    .run(active ? '1' : '0')
 }
 
 export function seedNotesDemo(anneeId?: number): { message: string; notesCount: number } {
