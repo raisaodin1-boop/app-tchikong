@@ -544,6 +544,62 @@ export interface RechercheResultat {
   sous_label?: string
 }
 
+// --- Administratif ---
+
+export interface PersonnelFormData {
+  matricule?: string
+  nom: string
+  prenom: string
+  sexe: Sexe
+  telephone?: string
+  email?: string
+  poste: PostePersonnel
+  date_embauche?: string
+  actif?: boolean
+}
+
+export interface UtilisateurFormData {
+  username: string
+  nom: string
+  prenom: string
+  role: RoleUtilisateur
+  password?: string
+  actif?: boolean
+}
+
+export interface DocumentOfficielDetail extends DocumentOfficiel {
+  eleve_nom: string
+  eleve_prenom: string
+  eleve_matricule: string
+  generateur_nom: string | null
+}
+
+export interface JournalActiviteDetail extends JournalActivite {
+  utilisateur_nom: string | null
+}
+
+export interface AdminDashboard {
+  personnel_total: number
+  personnel_actif: number
+  utilisateurs_actifs: number
+  classes_total: number
+  classes_surchargees: number
+  documents_generes: number
+  activites_recentes: JournalActiviteDetail[]
+}
+
+export interface JournalFiltres {
+  limit?: number
+  action?: string
+  entite?: string
+}
+
+export interface DocumentFiltres {
+  type?: string
+  recherche?: string
+  limit?: number
+}
+
 // --- Auth ---
 
 export interface LoginRequest {
@@ -643,5 +699,17 @@ export const IPC_CHANNELS = {
   FINANCES_RECU_PDF: 'finances:recuPdf',
   FINANCES_IMPAYES_PDF: 'finances:impayesPdf',
   FINANCES_DEPENSE_LIST: 'finances:depenseList',
-  FINANCES_DEPENSE_CREATE: 'finances:depenseCreate'
+  FINANCES_DEPENSE_CREATE: 'finances:depenseCreate',
+
+  // Administratif
+  ADMIN_DASHBOARD: 'admin:dashboard',
+  ADMIN_PERSONNEL_LIST: 'admin:personnelList',
+  ADMIN_PERSONNEL_CREATE: 'admin:personnelCreate',
+  ADMIN_PERSONNEL_UPDATE: 'admin:personnelUpdate',
+  ADMIN_UTILISATEUR_LIST: 'admin:utilisateurList',
+  ADMIN_UTILISATEUR_CREATE: 'admin:utilisateurCreate',
+  ADMIN_UTILISATEUR_UPDATE: 'admin:utilisateurUpdate',
+  ADMIN_UTILISATEUR_RESET_PASSWORD: 'admin:utilisateurResetPassword',
+  ADMIN_DOCUMENT_LIST: 'admin:documentList',
+  ADMIN_JOURNAL_LIST: 'admin:journalList'
 } as const

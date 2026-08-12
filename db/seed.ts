@@ -99,8 +99,9 @@ export function seedDemoData(): { message: string; count: number } {
   if (existing.c >= 50) {
     const notesResult = seedNotesDemo()
     const paymentsResult = seedPaymentsDemo()
+    const personnelResult = seedPersonnelDemo()
     return {
-      message: `Données déjà présentes (${existing.c} élèves). ${notesResult.message}. ${paymentsResult.message}`,
+      message: `Données déjà présentes (${existing.c} élèves). ${notesResult.message}. ${paymentsResult.message}. ${personnelResult.message}`,
       count: existing.c
     }
   }
@@ -267,6 +268,7 @@ export function seedDemoData(): { message: string; count: number } {
 
   seedNotesDemo(anneeId)
   seedPaymentsDemo(anneeId)
+  seedPersonnelDemo()
 
   return { message: `${count} élèves de démonstration créés`, count }
 }
@@ -410,4 +412,37 @@ export function seedPaymentsDemo(anneeId?: number): { message: string; count: nu
   })
 
   return { message: `${count} paiements de démonstration créés`, count }
+}
+
+export function seedPersonnelDemo(): { message: string; count: number } {
+  const db = getDb()
+
+  const existing = (db.prepare('SELECT COUNT(*) as c FROM enseignants').get() as { c: number }).c
+  if (existing > 0) {
+    return { message: 'Personnel de démonstration déjà présent', count: existing }
+  }
+
+  const personnel = [
+    ['PER-2025-0001', 'Ngono', 'Jean', 'M', '677123456', null, 'enseignant', '2020-09-01'],
+    ['PER-2025-0002', 'Mballa', 'Marie-Claire', 'F', '699234567', 'marie.mballa@tchikong.cm', 'enseignant', '2019-09-01'],
+    ['PER-2025-0003', 'Fouda', 'Patrick', 'M', '655345678', null, 'enseignant', '2021-09-01'],
+    ['PER-2025-0004', 'Essomba', 'Grace', 'F', '677456789', null, 'enseignant', '2022-09-01'],
+    ['PER-2025-0005', 'Ndjock', 'Paul', 'M', '699567890', 'p.ndjock@tchikong.cm', 'comptable', '2018-09-01'],
+    ['PER-2025-0006', 'Kouekam', 'Raisa', 'F', '677678901', 'directrice@tchikong.cm', 'directrice', '2015-09-01'],
+    ['PER-2025-0007', 'Tchinda', 'Emmanuel', 'M', '655789012', null, 'surveillant', '2023-09-01'],
+    ['PER-2025-0008', 'Abena', 'Sophie', 'F', '699890123', null, 'secretaire', '2020-09-01'],
+    ['PER-2025-0009', 'Mvondo', 'Alain', 'M', '677901234', null, 'enseignant', '2017-09-01'],
+    ['PER-2025-0010', 'Bekono', 'Céline', 'F', '655012345', null, 'enseignant', '2024-09-01']
+  ] as const
+
+  const insert = db.prepare(
+    `INSERT INTO enseignants (matricule, nom, prenom, sexe, telephone, email, poste, date_embauche, actif)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`
+  )
+
+  for (const p of personnel) {
+    insert.run(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7])
+  }
+
+  return { message: `${personnel.length} membres du personnel créés`, count: personnel.length }
 }

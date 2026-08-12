@@ -7,6 +7,7 @@ import * as dashboardService from '../services/dashboard'
 import * as scolariteService from '../services/scolarite'
 import * as documentsService from '../services/documents'
 import * as financesService from '../services/finances'
+import * as adminService from '../services/admin'
 import { handlePdfAction, handlePdfPrint } from '../services/pdf-handler'
 import { backupDatabase, restoreDatabase, getDbPath } from '../../../db/database'
 import { seedDemoData, seedReferenceData } from '../../../db/seed'
@@ -60,6 +61,10 @@ export function registerIpcHandlers(): void {
     referentielService.listClasses(anneeId)
   )
   ipcMain.handle(IPC_CHANNELS.CLASSE_CREATE, (_, data) => referentielService.createClasse(data))
+  ipcMain.handle(IPC_CHANNELS.CLASSE_UPDATE, (_, id, data, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return adminService.updateClasse(id, data, userId ?? undefined)
+  })
 
   // Élèves
   ipcMain.handle(IPC_CHANNELS.ELEVE_LIST, (_, filtres) => elevesService.listEleves(filtres))
@@ -285,4 +290,57 @@ export function registerIpcHandlers(): void {
       'Liste des impayés'
     )
   })
+
+  // --- Administratif ---
+  ipcMain.handle(IPC_CHANNELS.ADMIN_DASHBOARD, (_, anneeId) =>
+    adminService.getAdminDashboard(anneeId)
+  )
+  ipcMain.handle(IPC_CHANNELS.ADMIN_PERSONNEL_LIST, (_, actifOnly) =>
+    adminService.listPersonnel(actifOnly)
+  )
+  ipcMain.handle(IPC_CHANNELS.ADMIN_PERSONNEL_CREATE, (_, data, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return adminService.createPersonnel(data, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.ADMIN_PERSONNEL_UPDATE, (_, id, data, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return adminService.updatePersonnel(id, data, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.ADMIN_UTILISATEUR_LIST, (_, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return adminService.listUtilisateurs()
+  })
+  ipcMain.handle(IPC_CHANNELS.ADMIN_UTILISATEUR_CREATE, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    const userId = authService.getCurrentUserId(token)
+    return adminService.createUtilisateur(data, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.ADMIN_UTILISATEUR_UPDATE, (_, id, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    const userId = authService.getCurrentUserId(token)
+    return adminService.updateUtilisateur(id, data, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.ADMIN_UTILISATEUR_RESET_PASSWORD, (_, id, newPassword, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    const userId = authService.getCurrentUserId(token)
+    return adminService.resetUtilisateurPassword(id, newPassword, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.ADMIN_DOCUMENT_LIST, (_, filtres) =>
+    adminService.listDocumentsOfficiels(filtres)
+  )
+  ipcMain.handle(IPC_CHANNELS.ADMIN_JOURNAL_LIST, (_, filtres) =>
+    adminService.listJournal(filtres)
+  )
 }

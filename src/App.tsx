@@ -17,7 +17,13 @@ import PaiementPage from './pages/finances/PaiementPage'
 import HistoriquePage from './pages/finances/HistoriquePage'
 import ImpayesPage from './pages/finances/ImpayesPage'
 import DepensesPage from './pages/finances/DepensesPage'
-import AdminPage from './pages/AdminPage'
+import AdminPage from './pages/admin/AdminPage'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import PersonnelPage from './pages/admin/PersonnelPage'
+import ClassesPage from './pages/admin/ClassesPage'
+import UtilisateursPage from './pages/admin/UtilisateursPage'
+import DocumentsPage from './pages/admin/DocumentsPage'
+import JournalPage from './pages/admin/JournalPage'
 import LoadingScreen from './components/ui/LoadingScreen'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -65,7 +71,14 @@ export default function App() {
           <Route path="impayes" element={<ImpayesPage />} />
           <Route path="depenses" element={<DepensesPage />} />
         </Route>
-        <Route path="admin" element={<AdminPage />} />
+        <Route path="admin" element={<AdminPage />}>
+          <Route index element={<AdminDashboardPage />} />
+          <Route path="personnel" element={<PersonnelPage />} />
+          <Route path="classes" element={<ClassesPage />} />
+          <Route path="utilisateurs" element={<UtilisateursPage />} />
+          <Route path="documents" element={<DocumentsPage />} />
+          <Route path="journal" element={<JournalPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

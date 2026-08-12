@@ -172,7 +172,31 @@ const api = {
   exportRecuPdf: (paiementId: number, action?: 'save' | 'print') =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_RECU_PDF, paiementId, action ?? 'save'),
   exportImpayesPdf: (anneeId: number, anneeLibelle: string, action?: 'save' | 'print') =>
-    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES_PDF, anneeId, anneeLibelle, action ?? 'save')
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES_PDF, anneeId, anneeLibelle, action ?? 'save'),
+
+  // Administratif
+  getAdminDashboard: (anneeId?: number): Promise<import('../../shared/types').AdminDashboard> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_DASHBOARD, anneeId),
+  listPersonnel: (actifOnly?: boolean): Promise<import('../../shared/types').Enseignant[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_PERSONNEL_LIST, actifOnly),
+  createPersonnel: (data: import('../../shared/types').PersonnelFormData, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_PERSONNEL_CREATE, data, token),
+  updatePersonnel: (id: number, data: Partial<import('../../shared/types').PersonnelFormData>, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_PERSONNEL_UPDATE, id, data, token),
+  listUtilisateurs: (token: string): Promise<import('../../shared/types').Utilisateur[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_UTILISATEUR_LIST, token),
+  createUtilisateur: (data: import('../../shared/types').UtilisateurFormData, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_UTILISATEUR_CREATE, data, token),
+  updateUtilisateur: (id: number, data: Partial<import('../../shared/types').UtilisateurFormData>, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_UTILISATEUR_UPDATE, id, data, token),
+  resetUtilisateurPassword: (id: number, newPassword: string, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_UTILISATEUR_RESET_PASSWORD, id, newPassword, token),
+  listDocumentsOfficiels: (filtres?: import('../../shared/types').DocumentFiltres) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_DOCUMENT_LIST, filtres),
+  listJournal: (filtres?: import('../../shared/types').JournalFiltres) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_JOURNAL_LIST, filtres),
+  updateClasse: (id: number, data: { nom?: string; capacite_max?: number }, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CLASSE_UPDATE, id, data, token)
 }
 
 contextBridge.exposeInMainWorld('api', api)
