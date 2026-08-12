@@ -50,7 +50,7 @@ export function initializePersonnelAnnee(anneeId: number, userId?: number): numb
 }
 
 export function listPersonnelAnnee(anneeId: number): PersonnelAnneeDetail[] {
-  return getDb()
+  const rows = getDb()
     .prepare(
       `SELECT pa.*, e.matricule, e.nom, e.prenom, e.poste
        FROM personnel_annees pa
@@ -58,8 +58,8 @@ export function listPersonnelAnnee(anneeId: number): PersonnelAnneeDetail[] {
        WHERE pa.annee_scolaire_id = ?
        ORDER BY e.poste, e.nom, e.prenom`
     )
-    .all(anneeId)
-    .map((row) => ({ ...row, actif: Boolean(row.actif) })) as PersonnelAnneeDetail[]
+    .all(anneeId) as Record<string, unknown>[]
+  return rows.map((row) => ({ ...row, actif: Boolean(row.actif) })) as PersonnelAnneeDetail[]
 }
 
 export function configureSalaire(
@@ -126,7 +126,7 @@ export function getPaieMensuelle(anneeId: number, month: string): PaieMensuelle 
     }
   }
 
-  const salaries = db
+  const salaryRows = db
     .prepare(
       `SELECT pa.*, e.matricule, e.nom, e.prenom, e.poste,
               sm.id as salaire_id, ? as mois,
@@ -146,8 +146,11 @@ export function getPaieMensuelle(anneeId: number, month: string): PaieMensuelle 
          AND (pa.date_fin IS NULL OR substr(pa.date_fin, 1, 7) >= ?)
        ORDER BY e.poste, e.nom, e.prenom`
     )
-    .all(month, month, anneeId, month, month)
-    .map((row) => ({ ...row, actif: Boolean(row.actif) })) as PaieMensuelleRow[]
+    .all(month, month, anneeId, month, month) as Record<string, unknown>[]
+  const salaries = salaryRows.map((row) => ({
+    ...row,
+    actif: Boolean(row.actif)
+  })) as unknown as PaieMensuelleRow[]
 
   const configured = salaries.filter((row) => row.statut !== 'non_configure')
   const totalDue = configured.reduce((sum, row) => sum + row.montant_du, 0)
