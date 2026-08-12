@@ -418,7 +418,7 @@ export function seedPaymentsDemo(anneeId?: number): { message: string; count: nu
     const year = 2025
     const frais = db
       .prepare(
-        `SELECT f.id, f.type_frais
+        `SELECT f.id, f.type_frais, m.montant
          FROM frais_modeles f
          JOIN frais_montants m ON m.frais_modele_id = f.id
          WHERE f.annee_scolaire_id = ?
@@ -427,25 +427,28 @@ export function seedPaymentsDemo(anneeId?: number): { message: string; count: nu
              OR (f.mode_tarification = 'par_classe' AND m.classe_id = ?)
            )`
       )
-      .all(yearId, el.classe_id) as { id: number; type_frais: string }[]
-    const inscriptionId = frais.find((item) => item.type_frais === 'inscription')?.id
-    const scolariteId = frais.find((item) => item.type_frais === 'scolarite')?.id
+      .all(yearId, el.classe_id) as { id: number; type_frais: string; montant: number }[]
+    const inscription = frais.find((item) => item.type_frais === 'inscription')
+    const scolarite = frais.find((item) => item.type_frais === 'scolarite')
 
-    if (rand > 0.15 && inscriptionId) {
+    if (rand > 0.15 && inscription) {
       // Inscription payée
       insertPaiement.run(
-        el.eleve_id, yearId, 'inscription', inscriptionId, 20000,
+        el.eleve_id, yearId, 'inscription', inscription.id, inscription.montant,
         modes[recuNum % 4], `REC-${year}-${String(recuNum++).padStart(5, '0')}`,
         '2025-09-15'
       )
       count++
     }
 
-    if (rand > 0.4 && scolariteId) {
+    if (rand > 0.4 && scolarite) {
       // Scolarité partielle ou totale
-      const montant = rand > 0.7 ? 85000 : rand > 0.55 ? 50000 : 30000
+      const montant = Math.min(
+        scolarite.montant,
+        rand > 0.7 ? 85000 : rand > 0.55 ? 50000 : 30000
+      )
       insertPaiement.run(
-        el.eleve_id, yearId, 'scolarite', scolariteId, montant,
+        el.eleve_id, yearId, 'scolarite', scolarite.id, montant,
         modes[recuNum % 4], `REC-${year}-${String(recuNum++).padStart(5, '0')}`,
         rand > 0.6 ? '2025-10-01' : '2025-11-15'
       )
