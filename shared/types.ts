@@ -404,6 +404,50 @@ export interface PresenceJourData {
   }[]
 }
 
+export interface NoteInput {
+  eleve_id: number
+  valeur: number
+  note_sur?: number
+  appreciation?: string
+}
+
+export interface NotesGrid {
+  classe: { id: number; nom: string; section_id: number; section_code: string }
+  periode: PeriodeEvaluation
+  matieres: Matiere[]
+  eleves: { eleve_id: number; nom: string; prenom: string; matricule: string }[]
+  notes: Record<string, Note | null>
+}
+
+export interface EleveMoyenne {
+  eleve_id: number
+  nom: string
+  prenom: string
+  matricule: string
+  moyenne: number
+  rang: number
+  mention: MentionBulletin
+  details: {
+    matiere_id: number
+    matiere_nom: string
+    coefficient: number
+    valeur: number
+    note_sur: number
+    note_sur_20: number
+    moyenne_matiere: number
+  }[]
+}
+
+export interface BulletinData {
+  eleve: { id: number; nom: string; prenom: string; matricule: string; date_naissance: string; sexe: string }
+  classe: { nom: string; section_code: string; niveau_nom: string }
+  periode: PeriodeEvaluation
+  annee_libelle: string
+  moyenne: EleveMoyenne
+  appreciation_maitre: string | null
+  bulletin: Bulletin | null
+}
+
 // --- Dashboard ---
 
 export interface DashboardStats {
@@ -502,5 +546,18 @@ export const IPC_CHANNELS = {
   DASHBOARD_STATS: 'dashboard:stats',
 
   // Seed
-  SEED_DEMO: 'seed:demo'
+  SEED_DEMO: 'seed:demo',
+
+  // Scolarité
+  MATIERE_LIST: 'scolarite:matieres',
+  PERIODE_LIST: 'scolarite:periodes',
+  NOTES_GRID: 'scolarite:notesGrid',
+  NOTES_SAVE: 'scolarite:notesSave',
+  MOYENNES_CLASSE: 'scolarite:moyennes',
+  PALMARES: 'scolarite:palmares',
+  BULLETIN_GENERER: 'scolarite:bulletinGenerer',
+  BULLETIN_DATA: 'scolarite:bulletinData',
+  BULLETIN_LIST: 'scolarite:bulletinList',
+  BULLETIN_PDF: 'scolarite:bulletinPdf',
+  PALMARES_PDF: 'scolarite:palmaresPdf'
 } as const

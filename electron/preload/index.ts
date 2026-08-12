@@ -3,15 +3,22 @@ import { IPC_CHANNELS } from '../../shared/types'
 import type {
   AnneeScolaire,
   AuthSession,
+  Bulletin,
+  BulletinData,
   Classe,
   DashboardStats,
   Eleve,
   EleveFiltres,
   EleveFormData,
+  EleveMoyenne,
   HistoriqueEleve,
   Inscription,
   LoginRequest,
+  Matiere,
+  NoteInput,
+  NotesGrid,
   Niveau,
+  PeriodeEvaluation,
   PresenceEleve,
   PresenceJourData,
   RechercheResultat,
@@ -76,7 +83,50 @@ const api = {
 
   // Seed
   seedDemo: (): Promise<{ message: string; count: number }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.SEED_DEMO)
+    ipcRenderer.invoke(IPC_CHANNELS.SEED_DEMO),
+
+  // Scolarité
+  listMatieres: (sectionId: number): Promise<Matiere[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MATIERE_LIST, sectionId),
+  listPeriodes: (anneeId: number, type?: 'sequence' | 'trimestre'): Promise<PeriodeEvaluation[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PERIODE_LIST, anneeId, type),
+  getNotesGrid: (classeId: number, periodeId: number): Promise<NotesGrid | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.NOTES_GRID, classeId, periodeId),
+  saveNotes: (
+    classeId: number,
+    periodeId: number,
+    matiereId: number,
+    notes: NoteInput[],
+    token: string
+  ): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, classeId, periodeId, matiereId, notes, token),
+  getMoyennesClasse: (classeId: number, periodeId: number): Promise<EleveMoyenne[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MOYENNES_CLASSE, classeId, periodeId),
+  getPalmares: (classeId: number, periodeId: number): Promise<EleveMoyenne[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PALMARES, classeId, periodeId),
+  genererBulletins: (
+    classeId: number,
+    periodeId: number,
+    appreciations: Record<number, string> | undefined,
+    token: string
+  ): Promise<Bulletin[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BULLETIN_GENERER, classeId, periodeId, appreciations, token),
+  getBulletinData: (eleveId: number, periodeId: number): Promise<BulletinData | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BULLETIN_DATA, eleveId, periodeId),
+  listBulletinsClasse: (classeId: number, periodeId: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BULLETIN_LIST, classeId, periodeId),
+  exportBulletinPdf: (
+    eleveId: number,
+    periodeId: number
+  ): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BULLETIN_PDF, eleveId, periodeId),
+  exportPalmaresPdf: (
+    classeId: number,
+    periodeId: number,
+    classeNom?: string,
+    anneeLibelle?: string
+  ): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PALMARES_PDF, classeId, periodeId, classeNom, anneeLibelle)
 }
 
 contextBridge.exposeInMainWorld('api', api)

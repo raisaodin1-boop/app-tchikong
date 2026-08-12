@@ -7,7 +7,10 @@ import ElevesPage from './pages/eleves/ElevesPage'
 import EleveDetailPage from './pages/eleves/EleveDetailPage'
 import EleveFormPage from './pages/eleves/EleveFormPage'
 import PresencePage from './pages/eleves/PresencePage'
-import ScolaritePage from './pages/ScolaritePage'
+import ScolaritePage from './pages/scolarite/ScolaritePage'
+import NotesSaisiePage from './pages/scolarite/NotesSaisiePage'
+import BulletinsPage from './pages/scolarite/BulletinsPage'
+import PalmaresPage from './pages/scolarite/PalmaresPage'
 import FinancesPage from './pages/FinancesPage'
 import AdminPage from './pages/AdminPage'
 import LoadingScreen from './components/ui/LoadingScreen'
@@ -44,7 +47,12 @@ export default function App() {
         <Route path="eleves/:id" element={<EleveDetailPage />} />
         <Route path="eleves/:id/modifier" element={<EleveFormPage />} />
         <Route path="presence" element={<PresencePage />} />
-        <Route path="scolarite" element={<ScolaritePage />} />
+        <Route path="scolarite" element={<ScolaritePage />}>
+          <Route index element={<Navigate to="notes" replace />} />
+          <Route path="notes" element={<NotesSaisiePage />} />
+          <Route path="bulletins" element={<BulletinsPage />} />
+          <Route path="palmares" element={<PalmaresPage />} />
+        </Route>
         <Route path="finances" element={<FinancesPage />} />
         <Route path="admin" element={<AdminPage />} />
       </Route>

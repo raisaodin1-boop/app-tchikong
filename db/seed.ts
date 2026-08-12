@@ -97,7 +97,11 @@ export function seedDemoData(): { message: string; count: number } {
 
   const existing = db.prepare('SELECT COUNT(*) as c FROM eleves').get() as { c: number }
   if (existing.c >= 50) {
-    return { message: 'Données de démonstration déjà présentes', count: existing.c }
+    const notesResult = seedNotesDemo()
+    return {
+      message: `Données déjà présentes (${existing.c} élèves). ${notesResult.message}`,
+      count: existing.c
+    }
   }
 
   // Année scolaire
@@ -256,5 +260,72 @@ export function seedDemoData(): { message: string; count: number } {
     insertTarif.run(anneeId, n.id, n.section_id, montant)
   }
 
+  seedNotesDemo(anneeId)
+
   return { message: `${count} élèves de démonstration créés`, count }
+}
+
+export function seedNotesDemo(anneeId?: number): { message: string; notesCount: number } {
+  const db = getDb()
+
+  const existingNotes = (db.prepare('SELECT COUNT(*) as c FROM notes').get() as { c: number }).c
+  if (existingNotes > 0) {
+    return { message: 'Notes de démonstration déjà présentes', notesCount: existingNotes }
+  }
+
+  let yearId = anneeId
+  if (!yearId) {
+    const annee = db.prepare('SELECT id FROM annees_scolaires WHERE active = 1').get() as
+      | { id: number }
+      | undefined
+    yearId = annee?.id
+  }
+  if (!yearId) return { message: 'Aucune année scolaire active', notesCount: 0 }
+
+  const periode = db
+    .prepare(
+      `SELECT id FROM periodes_evaluation WHERE annee_scolaire_id = ? AND type = 'sequence' AND numero = 1`
+    )
+    .get(yearId) as { id: number } | undefined
+
+  if (!periode) return { message: 'Période introuvable', notesCount: 0 }
+
+  const classe = db
+    .prepare(`SELECT id, section_id FROM classes WHERE annee_scolaire_id = ? AND nom = 'CE1 A'`)
+    .get(yearId) as { id: number; section_id: number } | undefined
+
+  if (!classe) return { message: 'Classe CE1 A introuvable', notesCount: 0 }
+
+  const matieres = db
+    .prepare('SELECT id, coefficient FROM matieres WHERE section_id = ?')
+    .all(classe.section_id) as { id: number; coefficient: number }[]
+
+  const eleves = db
+    .prepare(
+      `SELECT eleve_id FROM inscriptions WHERE classe_id = ? AND statut = 'actif' LIMIT 20`
+    )
+    .all(classe.id) as { eleve_id: number }[]
+
+  const insertNote = db.prepare(
+    `INSERT OR IGNORE INTO notes (eleve_id, matiere_id, periode_id, valeur, note_sur, coefficient)
+     VALUES (?, ?, ?, ?, 20, ?)`
+  )
+
+  let notesCount = 0
+  for (const eleve of eleves) {
+    for (const matiere of matieres) {
+      const base = 8 + ((eleve.eleve_id + matiere.id) % 10)
+      const valeur = Math.min(20, base + Math.random() * 4)
+      insertNote.run(
+        eleve.eleve_id,
+        matiere.id,
+        periode.id,
+        Math.round(valeur * 2) / 2,
+        matiere.coefficient
+      )
+      notesCount++
+    }
+  }
+
+  return { message: `${notesCount} notes de démonstration créées`, notesCount }
 }

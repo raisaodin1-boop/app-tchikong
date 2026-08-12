@@ -24,6 +24,17 @@ interface TchikongApi {
   getDashboardStats: (anneeId?: number) => Promise<unknown>
   rechercheGlobale: (term: string, anneeId?: number) => Promise<unknown[]>
   seedDemo: () => Promise<{ message: string; count: number }>
+  listMatieres: (sectionId: number) => Promise<unknown[]>
+  listPeriodes: (anneeId: number, type?: string) => Promise<unknown[]>
+  getNotesGrid: (classeId: number, periodeId: number) => Promise<unknown>
+  saveNotes: (classeId: number, periodeId: number, matiereId: number, notes: unknown[], token: string) => Promise<boolean>
+  getMoyennesClasse: (classeId: number, periodeId: number) => Promise<unknown[]>
+  getPalmares: (classeId: number, periodeId: number) => Promise<unknown[]>
+  genererBulletins: (classeId: number, periodeId: number, appreciations: Record<number, string> | undefined, token: string) => Promise<unknown[]>
+  getBulletinData: (eleveId: number, periodeId: number) => Promise<unknown>
+  listBulletinsClasse: (classeId: number, periodeId: number) => Promise<unknown[]>
+  exportBulletinPdf: (eleveId: number, periodeId: number) => Promise<{ success: boolean; path?: string; error?: string }>
+  exportPalmaresPdf: (classeId: number, periodeId: number, classeNom?: string, anneeLibelle?: string) => Promise<{ success: boolean; path?: string; error?: string }>
 }
 
 declare global {

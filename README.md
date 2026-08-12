@@ -16,7 +16,7 @@ Application desktop de gestion scolaire pour le **Groupe Scolaire Bilingue Prima
 |--------|--------|
 | Socle technique (DB, auth, navigation) | ✅ |
 | Gestion des élèves (CRUD, recherche, présence) | ✅ |
-| Scolarité (notes, bulletins) | 🔜 |
+| Scolarité (notes, moyennes, bulletins PDF, palmarès) | ✅ |
 | Finances (paiements, reçus) | 🔜 |
 | Administratif (personnel, documents) | 🔜 |
 
