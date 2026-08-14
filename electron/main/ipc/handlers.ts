@@ -405,8 +405,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ADMIN_DASHBOARD, (_, anneeId) =>
     adminService.getAdminDashboard(anneeId)
   )
-  ipcMain.handle(IPC_CHANNELS.ADMIN_PERSONNEL_LIST, (_, actifOnly) =>
-    adminService.listPersonnel(actifOnly)
+  ipcMain.handle(IPC_CHANNELS.ADMIN_PERSONNEL_LIST, (_, actifOnly, anneeId) =>
+    adminService.listPersonnel(actifOnly, anneeId)
   )
   ipcMain.handle(IPC_CHANNELS.ADMIN_PERSONNEL_CREATE, (_, data, token) => {
     const session = authService.getSession(token)

@@ -116,10 +116,12 @@ export interface Classe {
   section_id: number
   nom: string
   capacite_max: number
+  titulaire_id?: number | null
   // Jointures
   niveau_nom?: string
   section_code?: SectionCode
   effectif?: number
+  titulaire_nom?: string | null
 }
 
 export interface Utilisateur {
@@ -278,6 +280,8 @@ export interface Enseignant {
   poste: PostePersonnel
   date_embauche: string | null
   actif: boolean
+  classe_titulaire_id?: number | null
+  classe_titulaire_nom?: string | null
 }
 
 export interface AffectationEnseignant {
@@ -513,7 +517,7 @@ export interface EleveMoyenne {
 
 export interface BulletinData {
   eleve: { id: number; nom: string; prenom: string; matricule: string; date_naissance: string; sexe: string }
-  classe: { nom: string; section_code: string; niveau_nom: string }
+  classe: { nom: string; section_code: string; niveau_nom: string; titulaire_nom?: string | null }
   periode: PeriodeEvaluation
   annee_libelle: string
   moyenne: EleveMoyenne
@@ -799,6 +803,8 @@ export interface PersonnelFormData {
   poste: PostePersonnel
   date_embauche?: string
   actif?: boolean
+  /** Classe dont l’enseignant est titulaire (maître de classe, bulletin). */
+  classe_id?: number | null
 }
 
 export interface UtilisateurFormData {

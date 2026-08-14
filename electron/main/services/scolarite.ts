@@ -50,7 +50,7 @@ export interface EleveMoyenne {
 
 export interface BulletinData {
   eleve: { id: number; nom: string; prenom: string; matricule: string; date_naissance: string; sexe: string }
-  classe: { nom: string; section_code: string; niveau_nom: string }
+  classe: { nom: string; section_code: string; niveau_nom: string; titulaire_nom?: string | null }
   periode: PeriodeEvaluation
   annee_libelle: string
   moyenne: EleveMoyenne
@@ -336,12 +336,14 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
 
   const inscription = db
     .prepare(
-      `SELECT c.nom as classe_nom, s.code as section_code, n.nom as niveau_nom, i.classe_id, a.libelle as annee_libelle
+      `SELECT c.nom as classe_nom, s.code as section_code, n.nom as niveau_nom, i.classe_id, a.libelle as annee_libelle,
+        CASE WHEN t.id IS NOT NULL THEN t.prenom || ' ' || t.nom ELSE NULL END as titulaire_nom
        FROM inscriptions i
        JOIN classes c ON c.id = i.classe_id
        JOIN sections s ON s.id = i.section_id
        JOIN niveaux n ON n.id = i.niveau_id
        JOIN annees_scolaires a ON a.id = i.annee_scolaire_id
+       LEFT JOIN enseignants t ON t.id = c.titulaire_id
        WHERE i.eleve_id = ? AND i.annee_scolaire_id = ?
        ORDER BY i.date_inscription DESC LIMIT 1`
     )
@@ -351,6 +353,7 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
     niveau_nom: string
     classe_id: number
     annee_libelle: string
+    titulaire_nom: string | null
   } | undefined
 
   if (!inscription) return null
@@ -375,7 +378,8 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
     classe: {
       nom: inscription.classe_nom,
       section_code: inscription.section_code,
-      niveau_nom: inscription.niveau_nom
+      niveau_nom: inscription.niveau_nom,
+      titulaire_nom: inscription.titulaire_nom
     },
     periode,
     annee_libelle: inscription.annee_libelle,

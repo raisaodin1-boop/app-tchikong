@@ -67,7 +67,8 @@ function runMigrations(database: Database.Database): void {
     { version: 3, file: '003_fee_modules.sql', name: 'fee_modules' },
     { version: 4, file: '004_payroll.sql', name: 'payroll' },
     { version: 5, file: '005_sessions.sql', name: 'sessions_persistantes' },
-    { version: 6, file: '006_annee_pedagogie.sql', name: 'annee_pedagogie' }
+    { version: 6, file: '006_annee_pedagogie.sql', name: 'annee_pedagogie' },
+    { version: 7, file: '007_titulaire_classe.sql', name: 'titulaire_classe' }
   ]
 
   for (const migration of migrationFiles) {

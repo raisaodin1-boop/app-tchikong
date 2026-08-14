@@ -6,6 +6,7 @@ import feeModulesMigrationSql from '../../db/migrations/003_fee_modules.sql?raw'
 import payrollMigrationSql from '../../db/migrations/004_payroll.sql?raw'
 import sessionsMigrationSql from '../../db/migrations/005_sessions.sql?raw'
 import pedagogieMigrationSql from '../../db/migrations/006_annee_pedagogie.sql?raw'
+import titulaireMigrationSql from '../../db/migrations/007_titulaire_classe.sql?raw'
 
 const STORAGE_DB = 'tchikong-offline-storage'
 const STORAGE_VERSION = 1
@@ -162,7 +163,8 @@ function runBrowserMigrations(db: Database): void {
     { version: 3, name: 'fee_modules', sql: feeModulesMigrationSql },
     { version: 4, name: 'payroll', sql: payrollMigrationSql },
     { version: 5, name: 'sessions_persistantes', sql: sessionsMigrationSql },
-    { version: 6, name: 'annee_pedagogie', sql: pedagogieMigrationSql }
+    { version: 6, name: 'annee_pedagogie', sql: pedagogieMigrationSql },
+    { version: 7, name: 'titulaire_classe', sql: titulaireMigrationSql }
   ]
 
   for (const migration of migrations) {

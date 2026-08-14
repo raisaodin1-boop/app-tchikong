@@ -22,6 +22,7 @@ export async function templateBulletin(data: BulletinData): Promise<Uint8Array> 
     { label: 'Matricule', value: data.eleve.matricule },
     { label: 'Classe', value: `${data.classe.nom} (${data.classe.section_code})` },
     { label: 'Niveau', value: data.classe.niveau_nom },
+    { label: 'Maître de classe', value: data.classe.titulaire_nom || '—' },
     { label: 'Date de naissance', value: formatDate(data.eleve.date_naissance) }
   ])
 
@@ -94,7 +95,7 @@ export async function templateBulletin(data: BulletinData): Promise<Uint8Array> 
 
   builder.drawSignatureBlocks(
     [
-      { title: 'Le Maître de classe', subtitle: 'Nom et signature' },
+      { title: 'Le Maître de classe', subtitle: data.classe.titulaire_nom || 'Nom et signature' },
       { title: 'La Directrice', subtitle: 'Cachet et signature' }
     ],
     `Fait à Douala, le ${formatDate(new Date().toISOString())}`

@@ -11,12 +11,14 @@ import {
   Banknote,
   CalendarDays,
   ArrowRightLeft,
-  ShieldAlert
+  ShieldAlert,
+  BookOpen
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
 const tabs = [
   { to: '/admin', icon: LayoutDashboard, label: "Vue d'ensemble", end: true },
+  { to: '/admin/enseignants', icon: BookOpen, label: 'Enseignants' },
   { to: '/admin/personnel', icon: Users, label: 'Personnel' },
   { to: '/admin/classes', icon: GraduationCap, label: 'Classes' },
   { to: '/admin/passage', icon: ArrowRightLeft, label: "Passage d'année" },
@@ -41,7 +43,7 @@ export default function AdminPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Module Administratif</h1>
         <p className="text-sm text-gray-500">
-          Années scolaires, passage des élèves, calendrier, frais, personnel, classes, utilisateurs, documents et journal
+          Années scolaires, passage des élèves, calendrier, frais, enseignants, personnel, classes, utilisateurs, documents et journal
         </p>
       </div>
 

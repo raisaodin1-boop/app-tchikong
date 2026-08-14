@@ -7,25 +7,14 @@ import type {
   DocumentOfficiel,
   Enseignant,
   JournalActivite,
+  PersonnelFormData,
   PostePersonnel,
   RoleUtilisateur,
   Sexe,
   Utilisateur
 } from '../../../shared/types'
 
-// --- Types ---
-
-export interface PersonnelFormData {
-  matricule?: string
-  nom: string
-  prenom: string
-  sexe: Sexe
-  telephone?: string
-  email?: string
-  poste: PostePersonnel
-  date_embauche?: string
-  actif?: boolean
-}
+export type { PersonnelFormData }
 
 export interface UtilisateurFormData {
   username: string
@@ -80,8 +69,51 @@ function mapEnseignant(row: Record<string, unknown>): Enseignant {
     email: (row.email as string) || null,
     poste: row.poste as PostePersonnel,
     date_embauche: (row.date_embauche as string) || null,
-    actif: Boolean(row.actif)
+    actif: Boolean(row.actif),
+    classe_titulaire_id: (row.classe_titulaire_id as number) || null,
+    classe_titulaire_nom: (row.classe_titulaire_nom as string) || null
   }
+}
+
+const CLASSE_DETAIL_SQL = `
+  SELECT c.*, n.nom as niveau_nom, s.code as section_code,
+    CASE WHEN t.id IS NOT NULL THEN t.prenom || ' ' || t.nom ELSE NULL END as titulaire_nom,
+    (SELECT COUNT(*) FROM inscriptions i WHERE i.classe_id = c.id AND i.statut = 'actif') as effectif
+  FROM classes c
+  JOIN niveaux n ON n.id = c.niveau_id
+  JOIN sections s ON s.id = c.section_id
+  LEFT JOIN enseignants t ON t.id = c.titulaire_id
+`
+
+/** Affecte un enseignant comme maître titulaire d’une classe (une classe par enseignant et par année). */
+export function setTitulaireClasse(enseignantId: number, classeId: number | null): void {
+  const db = getDb()
+  const apply = db.transaction(() => {
+    if (classeId == null) {
+      db.prepare('UPDATE classes SET titulaire_id = NULL WHERE titulaire_id = ?').run(enseignantId)
+      return
+    }
+
+    const classe = db.prepare('SELECT id, annee_scolaire_id FROM classes WHERE id = ?').get(classeId) as
+      | { id: number; annee_scolaire_id: number }
+      | undefined
+    if (!classe) throw new Error('Classe introuvable')
+
+    const enseignant = db.prepare('SELECT id, poste FROM enseignants WHERE id = ?').get(enseignantId) as
+      | { id: number; poste: PostePersonnel }
+      | undefined
+    if (!enseignant) throw new Error('Enseignant introuvable')
+    if (enseignant.poste !== 'enseignant') {
+      throw new Error("Seul un enseignant peut être titulaire d'une classe")
+    }
+
+    db.prepare(
+      `UPDATE classes SET titulaire_id = NULL
+       WHERE titulaire_id = ? AND annee_scolaire_id = ?`
+    ).run(enseignantId, classe.annee_scolaire_id)
+    db.prepare('UPDATE classes SET titulaire_id = ? WHERE id = ?').run(enseignantId, classeId)
+  })
+  apply()
 }
 
 function generatePersonnelMatricule(): string {
@@ -146,19 +178,35 @@ export function getAdminDashboard(anneeScolaireId?: number): AdminDashboard {
 
 // --- Personnel ---
 
-export function listPersonnel(actifOnly = false): Enseignant[] {
-  let sql = 'SELECT * FROM enseignants'
-  if (actifOnly) sql += ' WHERE actif = 1'
-  sql += ' ORDER BY nom, prenom'
+export function listPersonnel(actifOnly = false, anneeScolaireId?: number): Enseignant[] {
+  let sql = `
+    SELECT e.*,
+      c.id as classe_titulaire_id,
+      c.nom as classe_titulaire_nom
+    FROM enseignants e
+    LEFT JOIN classes c ON c.titulaire_id = e.id
+      AND c.annee_scolaire_id = COALESCE(?, (SELECT id FROM annees_scolaires WHERE active = 1 LIMIT 1))
+  `
+  const params: unknown[] = [anneeScolaireId ?? null]
+  if (actifOnly) sql += ' WHERE e.actif = 1'
+  sql += ' ORDER BY e.nom, e.prenom'
 
-  const rows = getDb().prepare(sql).all() as Record<string, unknown>[]
+  const rows = getDb().prepare(sql).all(...params) as Record<string, unknown>[]
   return rows.map(mapEnseignant)
 }
 
-export function getPersonnel(id: number): Enseignant | null {
-  const row = getDb().prepare('SELECT * FROM enseignants WHERE id = ?').get(id) as
-    | Record<string, unknown>
-    | undefined
+export function getPersonnel(id: number, anneeScolaireId?: number): Enseignant | null {
+  const row = getDb()
+    .prepare(
+      `SELECT e.*,
+        c.id as classe_titulaire_id,
+        c.nom as classe_titulaire_nom
+       FROM enseignants e
+       LEFT JOIN classes c ON c.titulaire_id = e.id
+         AND c.annee_scolaire_id = COALESCE(?, (SELECT id FROM annees_scolaires WHERE active = 1 LIMIT 1))
+       WHERE e.id = ?`
+    )
+    .get(anneeScolaireId ?? null, id) as Record<string, unknown> | undefined
   return row ? mapEnseignant(row) : null
 }
 
@@ -184,6 +232,9 @@ export function createPersonnel(data: PersonnelFormData, userId?: number): Ensei
     )
 
   const id = Number(result.lastInsertRowid)
+  if (data.poste === 'enseignant' && data.classe_id) {
+    setTitulaireClasse(id, data.classe_id)
+  }
   logActivity(userId ?? null, 'creation', 'enseignant', id, `${data.prenom} ${data.nom}`)
   return getPersonnel(id)!
 }
@@ -197,6 +248,8 @@ export function updatePersonnel(
   const current = getPersonnel(id)
   if (!current) throw new Error('Personnel introuvable')
 
+  const poste = data.poste ?? current.poste
+
   db.prepare(
     `UPDATE enseignants SET
       nom = ?, prenom = ?, sexe = ?, telephone = ?, email = ?,
@@ -208,11 +261,17 @@ export function updatePersonnel(
     data.sexe ?? current.sexe,
     data.telephone !== undefined ? data.telephone || null : current.telephone,
     data.email !== undefined ? data.email || null : current.email,
-    data.poste ?? current.poste,
+    poste,
     data.date_embauche !== undefined ? data.date_embauche || null : current.date_embauche,
     data.actif !== undefined ? (data.actif ? 1 : 0) : current.actif ? 1 : 0,
     id
   )
+
+  if (poste !== 'enseignant') {
+    setTitulaireClasse(id, null)
+  } else if (data.classe_id !== undefined) {
+    setTitulaireClasse(id, data.classe_id)
+  }
 
   logActivity(userId ?? null, 'modification', 'enseignant', id)
   return getPersonnel(id)!
@@ -365,7 +424,7 @@ export function listJournal(filtres: JournalFiltres = {}): JournalActiviteDetail
 
 export function updateClasse(
   id: number,
-  data: { nom?: string; capacite_max?: number },
+  data: { nom?: string; capacite_max?: number; titulaire_id?: number | null },
   userId?: number
 ): Classe {
   const db = getDb()
@@ -378,19 +437,16 @@ export function updateClasse(
     id
   )
 
-  logActivity(userId ?? null, 'modification', 'classe', id)
-  const row = db
-    .prepare(
-      `SELECT c.*, n.nom as niveau_nom, s.code as section_code,
-        (SELECT COUNT(*) FROM inscriptions i WHERE i.classe_id = c.id AND i.statut = 'actif') as effectif
-       FROM classes c
-       JOIN niveaux n ON n.id = c.niveau_id
-       JOIN sections s ON s.id = c.section_id
-       WHERE c.id = ?`
-    )
-    .get(id) as Classe
+  if (data.titulaire_id !== undefined) {
+    if (data.titulaire_id == null) {
+      db.prepare('UPDATE classes SET titulaire_id = NULL WHERE id = ?').run(id)
+    } else {
+      setTitulaireClasse(data.titulaire_id, id)
+    }
+  }
 
-  return row
+  logActivity(userId ?? null, 'modification', 'classe', id)
+  return db.prepare(`${CLASSE_DETAIL_SQL} WHERE c.id = ?`).get(id) as Classe
 }
 
 // --- Mode démonstration ---

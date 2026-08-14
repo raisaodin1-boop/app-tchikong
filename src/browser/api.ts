@@ -466,7 +466,8 @@ const browserApi = {
   },
 
   getAdminDashboard: async (anneeId?: number) => adminService.getAdminDashboard(anneeId),
-  listPersonnel: async (actifOnly?: boolean) => adminService.listPersonnel(actifOnly),
+  listPersonnel: async (actifOnly?: boolean, anneeScolaireId?: number) =>
+    adminService.listPersonnel(actifOnly, anneeScolaireId),
   createPersonnel: async (data: PersonnelFormData, token: string) => {
     requireDirector(token)
     return mutate(() => adminService.createPersonnel(data, userId(token)))
@@ -500,7 +501,7 @@ const browserApi = {
   listJournal: async (filters?: JournalFiltres) => adminService.listJournal(filters),
   updateClasse: async (
     id: number,
-    data: { nom?: string; capacite_max?: number },
+    data: { nom?: string; capacite_max?: number; titulaire_id?: number | null },
     token: string
   ) => {
     requireDirector(token)

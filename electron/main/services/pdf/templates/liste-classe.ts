@@ -6,6 +6,7 @@ export interface ListeClasseData {
   section_code: string
   annee_libelle: string
   effectif: number
+  titulaire_nom?: string | null
   eleves: {
     numero: number
     matricule: string
@@ -25,7 +26,9 @@ export async function templateListeClasse(data: ListeClasseData): Promise<Uint8A
   builder.drawOfficialHeader()
   builder.drawDocumentTitle(
     'LISTE DE CLASSE',
-    `${data.classe_nom} (${data.section_code}) — ${data.annee_libelle} — Effectif : ${data.effectif}`
+    `${data.classe_nom} (${data.section_code}) — ${data.annee_libelle} — Effectif : ${data.effectif}${
+      data.titulaire_nom ? ` — Maître : ${data.titulaire_nom}` : ''
+    }`
   )
 
   builder.drawTable(
@@ -52,7 +55,7 @@ export async function templateListeClasse(data: ListeClasseData): Promise<Uint8A
 
   builder.drawSignatureBlocks(
     [
-      { title: 'Le Maître de classe', subtitle: 'Signature' },
+      { title: 'Le Maître de classe', subtitle: data.titulaire_nom || 'Signature' },
       { title: 'La Directrice', subtitle: 'Cachet et signature' }
     ],
     `Fait à Douala, le ${new Date().toLocaleDateString('fr-FR')}`

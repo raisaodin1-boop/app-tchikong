@@ -155,7 +155,8 @@ export default function App() {
           }
         >
           <Route index element={<AdminDashboardPage />} />
-          <Route path="personnel" element={<PersonnelPage />} />
+          <Route path="enseignants" element={<PersonnelPage kind="enseignant" />} />
+          <Route path="personnel" element={<PersonnelPage kind="personnel" />} />
           <Route path="classes" element={<ClassesPage />} />
           <Route path="passage" element={<PassageAnneePage />} />
           <Route path="calendrier" element={<CalendrierPage />} />

@@ -88,6 +88,7 @@ export function getListeClasseData(classeId: number): {
   section_code: string
   annee_libelle: string
   effectif: number
+  titulaire_nom: string | null
   eleves: {
     numero: number
     matricule: string
@@ -101,13 +102,17 @@ export function getListeClasseData(classeId: number): {
 
   const classe = db
     .prepare(
-      `SELECT c.nom as classe_nom, s.code as section_code, a.libelle as annee_libelle
+      `SELECT c.nom as classe_nom, s.code as section_code, a.libelle as annee_libelle,
+        CASE WHEN t.id IS NOT NULL THEN t.prenom || ' ' || t.nom ELSE NULL END as titulaire_nom
        FROM classes c
        JOIN sections s ON s.id = c.section_id
        JOIN annees_scolaires a ON a.id = c.annee_scolaire_id
+       LEFT JOIN enseignants t ON t.id = c.titulaire_id
        WHERE c.id = ?`
     )
-    .get(classeId) as { classe_nom: string; section_code: string; annee_libelle: string } | undefined
+    .get(classeId) as
+    | { classe_nom: string; section_code: string; annee_libelle: string; titulaire_nom: string | null }
+    | undefined
 
   if (!classe) return null
 
@@ -132,6 +137,7 @@ export function getListeClasseData(classeId: number): {
     section_code: classe.section_code,
     annee_libelle: classe.annee_libelle,
     effectif: eleves.length,
+    titulaire_nom: classe.titulaire_nom,
     eleves: eleves.map((e, i) => ({ numero: i + 1, ...e }))
   }
 }

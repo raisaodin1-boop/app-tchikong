@@ -163,7 +163,7 @@ export function startNewAnnee(
     if (previous) {
       const classes = db
         .prepare(
-          `SELECT niveau_id, section_id, nom, capacite_max
+          `SELECT niveau_id, section_id, nom, capacite_max, titulaire_id
            FROM classes WHERE annee_scolaire_id = ?`
         )
         .all(previous.id) as {
@@ -171,11 +171,12 @@ export function startNewAnnee(
         section_id: number
         nom: string
         capacite_max: number
+        titulaire_id: number | null
       }[]
       const insertClass = db.prepare(
         `INSERT INTO classes
-          (annee_scolaire_id, niveau_id, section_id, nom, capacite_max)
-         VALUES (?, ?, ?, ?, ?)`
+          (annee_scolaire_id, niveau_id, section_id, nom, capacite_max, titulaire_id)
+         VALUES (?, ?, ?, ?, ?, ?)`
       )
       for (const classe of classes) {
         insertClass.run(
@@ -183,7 +184,8 @@ export function startNewAnnee(
           classe.niveau_id,
           classe.section_id,
           classe.nom,
-          classe.capacite_max
+          classe.capacite_max,
+          classe.titulaire_id ?? null
         )
       }
       classesCopiees = classes.length
@@ -206,13 +208,18 @@ export function startNewAnnee(
   return { annee, classes_copiees: classesCopiees }
 }
 
+const CLASSE_LIST_SQL = `
+  SELECT c.*, n.nom as niveau_nom, s.code as section_code,
+    CASE WHEN t.id IS NOT NULL THEN t.prenom || ' ' || t.nom ELSE NULL END as titulaire_nom,
+    (SELECT COUNT(*) FROM inscriptions i WHERE i.classe_id = c.id AND i.statut = 'actif') as effectif
+  FROM classes c
+  JOIN niveaux n ON n.id = c.niveau_id
+  JOIN sections s ON s.id = c.section_id
+  LEFT JOIN enseignants t ON t.id = c.titulaire_id
+`
+
 export function listClasses(anneeScolaireId?: number): Classe[] {
-  const sql = `
-    SELECT c.*, n.nom as niveau_nom, s.code as section_code,
-      (SELECT COUNT(*) FROM inscriptions i WHERE i.classe_id = c.id AND i.statut = 'actif') as effectif
-    FROM classes c
-    JOIN niveaux n ON n.id = c.niveau_id
-    JOIN sections s ON s.id = c.section_id
+  const sql = `${CLASSE_LIST_SQL}
     ${anneeScolaireId ? 'WHERE c.annee_scolaire_id = ?' : ''}
     ORDER BY s.code, n.ordre, c.nom
   `
@@ -250,14 +257,7 @@ export function createClasse(data: {
     )
 
   const row = db
-    .prepare(
-      `SELECT c.*, n.nom as niveau_nom, s.code as section_code,
-        (SELECT COUNT(*) FROM inscriptions i WHERE i.classe_id = c.id AND i.statut = 'actif') as effectif
-       FROM classes c
-       JOIN niveaux n ON n.id = c.niveau_id
-       JOIN sections s ON s.id = c.section_id
-       WHERE c.id = ?`
-    )
+    .prepare(`${CLASSE_LIST_SQL} WHERE c.id = ?`)
     .get(result.lastInsertRowid) as Classe
   return row
 }

@@ -2,15 +2,16 @@ import { useEffect, useState } from 'react'
 import { Pencil, AlertTriangle, Plus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
-import type { Classe } from '@shared/types'
+import type { Classe, Enseignant } from '@shared/types'
 
 export default function ClassesPage() {
   const { token } = useAuth()
   const { anneeActive, sections, niveaux, refreshData } = useApp()
   const [classes, setClasses] = useState<Classe[]>([])
+  const [enseignants, setEnseignants] = useState<Enseignant[]>([])
   const [editing, setEditing] = useState<Classe | null>(null)
   const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState({ nom: '', capacite_max: 40 })
+  const [form, setForm] = useState({ nom: '', capacite_max: 40, titulaire_id: null as number | null })
   const [createForm, setCreateForm] = useState({
     nom: '',
     section_id: 0,
@@ -23,6 +24,8 @@ export default function ClassesPage() {
   const load = async () => {
     if (!anneeActive) return
     setClasses(await window.api.listClasses(anneeActive.id))
+    const personnel = await window.api.listPersonnel(true, anneeActive.id)
+    setEnseignants(personnel.filter((p: Enseignant) => p.poste === 'enseignant'))
   }
 
   useEffect(() => {
@@ -32,7 +35,11 @@ export default function ClassesPage() {
   const openEdit = (c: Classe) => {
     setCreating(false)
     setEditing(c)
-    setForm({ nom: c.nom, capacite_max: c.capacite_max })
+    setForm({
+      nom: c.nom,
+      capacite_max: c.capacite_max,
+      titulaire_id: c.titulaire_id ?? null
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -218,6 +225,29 @@ export default function ClassesPage() {
                 max={60}
               />
             </div>
+            <div className="md:col-span-2">
+              <label className="label">Maître titulaire (bulletin)</label>
+              <select
+                className="input"
+                value={form.titulaire_id ?? ''}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    titulaire_id: e.target.value ? Number(e.target.value) : null
+                  })
+                }
+              >
+                <option value="">Aucun</option>
+                {enseignants.map((ens) => (
+                  <option key={ens.id} value={ens.id}>
+                    {ens.prenom} {ens.nom}
+                    {ens.classe_titulaire_id && ens.classe_titulaire_id !== editing.id
+                      ? ` — déjà ${ens.classe_titulaire_nom}`
+                      : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="flex gap-2 mt-4">
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>
@@ -237,6 +267,7 @@ export default function ClassesPage() {
               <th>Classe</th>
               <th>Section</th>
               <th>Niveau</th>
+              <th>Maître titulaire</th>
               <th className="text-center">Effectif</th>
               <th className="text-center">Capacité</th>
               <th className="text-center">Taux</th>
@@ -246,7 +277,7 @@ export default function ClassesPage() {
           <tbody>
             {classes.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-400">
+                <td colSpan={8} className="text-center py-8 text-gray-400">
                   Aucune classe
                 </td>
               </tr>
@@ -267,6 +298,7 @@ export default function ClassesPage() {
                       <span className="badge-gray">{c.section_code}</span>
                     </td>
                     <td className="text-gray-500">{c.niveau_nom}</td>
+                    <td className="text-gray-600">{c.titulaire_nom || '—'}</td>
                     <td className="text-center font-semibold">{effectif}</td>
                     <td className="text-center text-gray-500">{c.capacite_max}</td>
                     <td className="text-center">
