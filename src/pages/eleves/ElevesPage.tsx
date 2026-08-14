@@ -27,22 +27,32 @@ export default function ElevesPage() {
   const [filtreSection, setFiltreSection] = useState<number | ''>('')
   const [filtreClasse, setFiltreClasse] = useState<number | ''>('')
   const [filtreStatut, setFiltreStatut] = useState<StatutEleve | ''>('actif')
-  const [showFilters, setShowFilters] = useState(false)
+  const [showFilters, setShowFilters] = useState(true)
   const [listPrinting, setListPrinting] = useState(false)
+
+  const classesFiltrees = classes.filter(
+    (c) => !filtreSection || c.section_id === filtreSection
+  )
+  const classeSelectionnee = classes.find((c) => c.id === filtreClasse)
 
   const handlePrintListe = async (action: 'save' | 'print') => {
     if (!filtreClasse) {
-      alert('Sélectionnez une classe dans les filtres pour imprimer la liste')
+      alert('Choisissez d’abord la classe dont vous voulez la liste')
       return
     }
     setListPrinting(true)
-    const result = await window.api.exportListeClassePdf(filtreClasse, action)
-    if (result.success && action === 'save' && result.path) {
-      alert(`Liste enregistrée : ${result.path}`)
-    } else if (result.error) {
-      alert(result.error)
+    try {
+      const result = await window.api.exportListeClassePdf(filtreClasse, action)
+      if (result.success && action === 'save' && result.path) {
+        alert(`Liste enregistrée : ${result.path}`)
+      } else if (!result.success) {
+        alert(result.error || 'Impossible de générer la liste de classe')
+      }
+    } catch (reason) {
+      alert(reason instanceof Error ? reason.message : 'Impossible de générer la liste de classe')
+    } finally {
+      setListPrinting(false)
     }
-    setListPrinting(false)
   }
 
   const loadEleves = async () => {
@@ -76,30 +86,68 @@ export default function ElevesPage() {
             {eleves.length} élève{eleves.length !== 1 ? 's' : ''} trouvé{eleves.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            className="btn-secondary btn-sm"
-            onClick={() => handlePrintListe('print')}
-            disabled={listPrinting || !filtreClasse}
-            title="Imprimer la liste de classe"
-          >
-            <Printer className="h-4 w-4" />
-            Imprimer
-          </button>
-          <button
-            className="btn-secondary btn-sm"
-            onClick={() => handlePrintListe('save')}
-            disabled={listPrinting || !filtreClasse}
-            title="Exporter la liste en PDF"
-          >
-            <FileDown className="h-4 w-4" />
-            Liste PDF
-          </button>
-          <Link to="/eleves/nouveau" className="btn-primary btn-sm">
-            <Plus className="h-4 w-4" />
-            Nouvel élève
-          </Link>
+        <Link to="/eleves/nouveau" className="btn-primary btn-sm">
+          <Plus className="h-4 w-4" />
+          Nouvel élève
+        </Link>
+      </div>
+
+      <div className="card p-4 mb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <div className="flex-1 min-w-[180px]">
+            <label className="label">Classe à imprimer</label>
+            <select
+              className="input"
+              value={filtreClasse}
+              onChange={(e) => {
+                const id = e.target.value ? Number(e.target.value) : ''
+                setFiltreClasse(id)
+                if (id) {
+                  const classe = classes.find((c) => c.id === id)
+                  if (classe) setFiltreSection(classe.section_id)
+                }
+              }}
+            >
+              <option value="">Choisir une classe…</option>
+              {classesFiltrees.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nom} ({c.section_code}){c.effectif != null ? ` — ${c.effectif} élève(s)` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn-primary btn-sm"
+              onClick={() => void handlePrintListe('print')}
+              disabled={listPrinting || !filtreClasse}
+              title={
+                filtreClasse
+                  ? `Imprimer la liste de ${classeSelectionnee?.nom ?? 'la classe'}`
+                  : 'Choisissez une classe'
+              }
+            >
+              <Printer className="h-4 w-4" />
+              {listPrinting ? 'Préparation...' : 'Imprimer la liste'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => void handlePrintListe('save')}
+              disabled={listPrinting || !filtreClasse}
+              title="Enregistrer la liste en PDF"
+            >
+              <FileDown className="h-4 w-4" />
+              Enregistrer le PDF
+            </button>
+          </div>
         </div>
+        {!filtreClasse && (
+          <p className="mt-2 text-xs text-gray-500">
+            Sélectionnez une classe pour afficher ses élèves et imprimer la liste.
+          </p>
+        )}
       </div>
 
       <div className="card p-4 mb-4">
@@ -115,6 +163,7 @@ export default function ElevesPage() {
             />
           </div>
           <button
+            type="button"
             className={`btn-secondary btn-sm ${showFilters ? 'ring-2 ring-tchikong-500' : ''}`}
             onClick={() => setShowFilters(!showFilters)}
           >
@@ -130,9 +179,10 @@ export default function ElevesPage() {
               <select
                 className="input"
                 value={filtreSection}
-                onChange={(e) =>
+                onChange={(e) => {
                   setFiltreSection(e.target.value ? Number(e.target.value) : '')
-                }
+                  setFiltreClasse('')
+                }}
               >
                 <option value="">Toutes</option>
                 {sections.map((s) => (
@@ -152,9 +202,9 @@ export default function ElevesPage() {
                 }
               >
                 <option value="">Toutes</option>
-                {classes.map((c) => (
+                {classesFiltrees.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.nom}
+                    {c.nom} ({c.section_code})
                   </option>
                 ))}
               </select>
