@@ -65,8 +65,9 @@ export class PdfBuilder {
     return this
   }
 
-  getY(): number {
-    return this.y
+  private textWidth(text: string, size: number, bold = false): number {
+    const font = bold ? this.fontBold : this.font
+    return font.widthOfTextAtSize(sanitizeText(text), size)
   }
 
   setY(y: number): this {
@@ -170,7 +171,7 @@ export class PdfBuilder {
     })
     this.drawText(`${SCHOOL.subtitle}`, MARGINS.left + 8, A4.height - MARGINS.top + 2, 8, true, COLORS.primary)
     if (this.documentTitle) {
-      const tw = this.font.widthOfTextAtSize(this.documentTitle, 8)
+      const tw = this.textWidth(this.documentTitle, 8)
       this.drawText(this.documentTitle, A4.width - MARGINS.right - tw - 8, A4.height - MARGINS.top + 2, 8, false, COLORS.textMuted)
     }
     this.y = A4.height - MARGINS.top - 30
@@ -180,7 +181,7 @@ export class PdfBuilder {
   drawDocumentTitle(title: string, subtitle?: string): this {
     this.ensureSpace(50)
     const cx = A4.width / 2
-    const tw = this.fontBold.widthOfTextAtSize(title, 14)
+    const tw = this.textWidth(title, 14, true)
     this.page.drawRectangle({
       x: cx - tw / 2 - 16,
       y: this.y - 18,
@@ -237,7 +238,7 @@ export class PdfBuilder {
     })
 
     for (const col of columns) {
-      const tw = this.fontBold.widthOfTextAtSize(col.header, 8)
+      const tw = this.textWidth(col.header, 8, true)
       const tx =
         col.align === 'center'
           ? x + (col.width - tw) / 2
@@ -500,12 +501,12 @@ export class PdfBuilder {
 
     if (this.documentNumber) {
       const num = `N° ${this.documentNumber}`
-      const nw = this.font.widthOfTextAtSize(num, 6.5)
+      const nw = this.textWidth(num, 6.5)
       this.drawText(num, A4.width / 2 - nw / 2, footerY, 6.5, false, COLORS.textMuted)
     }
 
     const pageLabel = `Page ${this.pageNum}`
-    const pw = this.font.widthOfTextAtSize(pageLabel, 6.5)
+    const pw = this.textWidth(pageLabel, 6.5)
     this.drawText(pageLabel, A4.width - MARGINS.right - pw, footerY, 6.5, false, COLORS.textMuted)
 
     return this
@@ -531,8 +532,7 @@ export class PdfBuilder {
     bold = false,
     color: RGB = COLORS.text
   ): void {
-    const font = bold ? this.fontBold : this.font
-    const tw = font.widthOfTextAtSize(sanitizeText(text), size)
+    const tw = this.textWidth(text, size, bold)
     this.drawText(text, cx - tw / 2, y, size, bold, color)
   }
 
@@ -547,13 +547,23 @@ export class PdfBuilder {
 }
 
 function sanitizeText(text: string): string {
-  return text
+  const mapped = String(text ?? '')
+    .replace(/[\u00A0\u202F\u2000-\u200B\u2028\u2029\u2060\uFEFF]/g, ' ')
+    .replace(/œ/g, 'oe')
+    .replace(/Œ/g, 'OE')
+    .replace(/æ/g, 'ae')
+    .replace(/Æ/g, 'AE')
+    .replace(/€/g, 'EUR')
     .replace(/→/g, '->')
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/…/g, '...')
     .replace(/–/g, '-')
     .replace(/—/g, '-')
+    .replace(/²/g, '2')
+    .replace(/³/g, '3')
+  // Helvetica / WinAnsi : ASCII + Latin-1. Le reste (ex. espace insécable fine 0x202F) casse le PDF.
+  return mapped.replace(/[^\u0009\u000A\u000D\u0020-\u007E\u00A0-\u00FF]/g, '?')
 }
 
 function wrapParagraph(text: string, maxChars: number): string[] {

@@ -5,7 +5,8 @@ import type { RecuData } from '../../finances'
 import { MODE_PAIEMENT_LABELS } from '../../finances'
 
 function formatMoney(n: number): string {
-  return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
+  const rounded = Math.round(Number(n) || 0)
+  return `${String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} FCFA`
 }
 
 export async function templateRecuPaiement(data: RecuData): Promise<Uint8Array> {
