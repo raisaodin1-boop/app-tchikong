@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, CreditCard, History, AlertCircle, Receipt, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, CreditCard, History, AlertCircle, Receipt, BarChart3, CalendarClock } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
 const tabs = [
@@ -8,7 +8,8 @@ const tabs = [
   { to: '/finances/historique', icon: History, label: 'Historique' },
   { to: '/finances/impayes', icon: AlertCircle, label: 'Impayés' },
   { to: '/finances/depenses', icon: Receipt, label: 'Dépenses', financeOnly: true },
-  { to: '/finances/bilan', icon: BarChart3, label: 'Bilan annuel', financeOnly: true }
+  { to: '/finances/bilan', icon: BarChart3, label: 'Bilan annuel', financeOnly: true },
+  { to: '/finances/echeancier', icon: CalendarClock, label: 'Échéancier', financeOnly: true }
 ]
 
 export default function FinancesPage() {

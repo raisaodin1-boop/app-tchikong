@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { ClipboardEdit, FileText, Trophy } from 'lucide-react'
+import { ClipboardEdit, FileText, Trophy, CalendarClock } from 'lucide-react'
 
 const tabs = [
   { to: '/scolarite/notes', icon: ClipboardEdit, label: 'Saisie des notes' },
   { to: '/scolarite/bulletins', icon: FileText, label: 'Bulletins' },
-  { to: '/scolarite/palmares', icon: Trophy, label: 'Palmarès' }
+  { to: '/scolarite/palmares', icon: Trophy, label: 'Palmarès' },
+  { to: '/scolarite/emploi-du-temps', icon: CalendarClock, label: 'Emploi du temps' }
 ]
 
 export default function ScolaritePage() {
@@ -13,7 +14,7 @@ export default function ScolaritePage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Module Scolarité</h1>
         <p className="text-sm text-gray-500">
-          Matières, notes, moyennes, bulletins et palmarès
+          Matières, notes, moyennes, bulletins, palmarès et emploi du temps
         </p>
       </div>
 

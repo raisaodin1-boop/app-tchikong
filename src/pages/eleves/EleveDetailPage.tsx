@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Phone, MapPin, Calendar, User, FileText, Printer, Wallet } from 'lucide-react'
+import { ArrowLeft, Edit, Phone, MapPin, Calendar, User, FileText, Printer, Wallet, Camera, Paperclip, Trash2 } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatDateFr } from '../../lib/dates'
@@ -11,8 +11,10 @@ import type {
   Inscription,
   ParentTuteur,
   HistoriqueEleve,
+  DocumentEleve,
   SituationFinanciere,
-  StatutEleve
+  StatutEleve,
+  TypeDocument
 } from '@shared/types'
 
 const lienLabels: Record<string, string> = {
@@ -54,6 +56,7 @@ export default function EleveDetailPage() {
   const [inscription, setInscription] = useState<Inscription | null>(null)
   const [parents, setParents] = useState<ParentTuteur[]>([])
   const [historique, setHistorique] = useState<HistoriqueEleve[]>([])
+  const [documents, setDocuments] = useState<DocumentEleve[]>([])
   const [situation, setSituation] = useState<SituationFinanciere | null>(null)
   const [loading, setLoading] = useState(true)
   const [docLoading, setDocLoading] = useState<string | null>(null)
@@ -87,12 +90,14 @@ export default function EleveDetailPage() {
         inscription: Inscription | null
         parents: ParentTuteur[]
         historique: HistoriqueEleve[]
+        documents?: DocumentEleve[]
       } | null) => {
       if (data) {
         setEleve(data.eleve)
         setInscription(data.inscription)
         setParents(data.parents)
         setHistorique(data.historique)
+        setDocuments(data.documents ?? [])
       }
       setLoading(false)
     })
@@ -119,12 +124,60 @@ export default function EleveDetailPage() {
       if (data) {
         setInscription(data.inscription)
         setHistorique(data.historique)
+        setDocuments(data.documents ?? [])
       }
     } catch (err) {
       alert((err as Error).message)
     } finally {
       setStatutSaving(false)
     }
+  }
+
+  const readFile = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(new Error('Lecture du fichier impossible'))
+      reader.readAsDataURL(file)
+    })
+
+  const handlePhoto = async (file: File | null) => {
+    if (!id || !token || !file) return
+    try {
+      const contenu = await readFile(file)
+      const updated = await window.api.setElevePhoto(Number(id), contenu, token)
+      setEleve(updated)
+    } catch (err) {
+      alert((err as Error).message)
+    }
+  }
+
+  const handleAddDoc = async (file: File | null, type: TypeDocument) => {
+    if (!id || !token || !file) return
+    try {
+      const contenu = await readFile(file)
+      const doc = await window.api.addDocumentEleve(
+        Number(id),
+        { type, nom_fichier: file.name, contenu },
+        token
+      )
+      setDocuments((current) => [doc, ...current])
+    } catch (err) {
+      alert((err as Error).message)
+    }
+  }
+
+  const handleDeleteDoc = async (docId: number) => {
+    if (!token || !confirm('Supprimer cette pièce jointe ?')) return
+    await window.api.deleteDocumentEleve(docId, token)
+    setDocuments((current) => current.filter((d) => d.id !== docId))
+  }
+
+  const docLabels: Record<TypeDocument, string> = {
+    acte_naissance: 'Acte de naissance',
+    certificat_transfert: 'Certificat de transfert',
+    photo_identite: "Photo d'identité",
+    autre: 'Autre'
   }
 
   if (loading) {
@@ -167,6 +220,27 @@ export default function EleveDetailPage() {
               <User className="h-5 w-5 text-tchikong-500" />
               Informations personnelles
             </h2>
+            <div className="flex gap-4 mb-4">
+              <div className="h-24 w-24 overflow-hidden rounded-lg bg-gray-100">
+                {eleve.photo_path ? (
+                  <img src={eleve.photo_path} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-gray-400">
+                    <Camera className="h-8 w-8" />
+                  </div>
+                )}
+              </div>
+              <label className="btn-secondary btn-sm self-end cursor-pointer">
+                <Camera className="h-4 w-4" />
+                Photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => void handlePhoto(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
             <dl className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <dt className="text-gray-500">Date de naissance</dt>
@@ -279,6 +353,45 @@ export default function EleveDetailPage() {
               </div>
             </div>
           )}
+
+          <div className="card p-5">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Paperclip className="h-5 w-5 text-tchikong-500" />
+              Pièces jointes
+            </h2>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {(Object.keys(docLabels) as TypeDocument[]).map((type) => (
+                <label key={type} className="btn-secondary btn-sm cursor-pointer">
+                  {docLabels[type]}
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      void handleAddDoc(e.target.files?.[0] ?? null, type)
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+            {documents.length === 0 ? (
+              <p className="text-sm text-gray-400">Aucune pièce. Ajoutez l’acte de naissance, un certificat, etc.</p>
+            ) : (
+              <ul className="space-y-2">
+                {documents.map((doc) => (
+                  <li key={doc.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                    <a href={doc.chemin} download={doc.nom_fichier} className="text-tchikong-700 hover:underline">
+                      {docLabels[doc.type]} — {doc.nom_fichier}
+                    </a>
+                    <button className="btn-icon text-red-500" onClick={() => handleDeleteDoc(doc.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
         <div className="space-y-4">

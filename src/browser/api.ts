@@ -7,6 +7,13 @@ import * as documentsService from '../../electron/main/services/documents'
 import * as financesService from '../../electron/main/services/finances'
 import * as adminService from '../../electron/main/services/admin'
 import * as payrollService from '../../electron/main/services/payroll'
+import * as pedagogieService from '../../electron/main/services/pedagogie'
+import {
+  getBackupSettings,
+  markBackupDone,
+  setBackupDirectory,
+  setBackupEnabled
+} from '../../electron/main/services/settings'
 import { generatePdf, getDefaultFilename, type PdfPayload } from '../../electron/main/services/pdf'
 import type { DocumentType } from '../../electron/main/services/pdf/config'
 import { seedDemoData, seedReferenceData } from '../../db/seed'
@@ -507,6 +514,104 @@ const browserApi = {
     requireDirector(token)
     if (confirmation !== 'QUITTER DEMO') throw new Error('Confirmation incorrecte')
     return mutate(() => adminService.exitDemoMode(userId(token)))
+  },
+
+  listDocumentsEleve: async (eleveId: number) => elevesService.listDocumentsEleve(eleveId),
+  addDocumentEleve: async (
+    eleveId: number,
+    data: { type: import('../../shared/types').TypeDocument; nom_fichier: string; contenu: string },
+    token: string
+  ) => mutate(() => elevesService.addDocumentEleve(eleveId, data, userId(token))),
+  deleteDocumentEleve: async (id: number, token: string) =>
+    mutate(() => elevesService.deleteDocumentEleve(id, userId(token))),
+  setElevePhoto: async (eleveId: number, contenu: string | null, token: string) =>
+    mutate(() => elevesService.setElevePhoto(eleveId, contenu, userId(token))),
+  listCandidatsPassage: async (anneeSourceId: number, anneeCibleId: number) =>
+    elevesService.listCandidatsPassage(anneeSourceId, anneeCibleId),
+  inscrirePassage: async (
+    anneeSourceId: number,
+    anneeCibleId: number,
+    lignes: import('../../shared/types').LignePassage[],
+    token: string
+  ) => {
+    requireAcademicAccess(token)
+    return mutate(() =>
+      elevesService.inscrirePassage(anneeSourceId, anneeCibleId, lignes, userId(token))
+    )
+  },
+
+  listCalendrier: async (anneeId: number) => pedagogieService.listCalendrier(anneeId),
+  upsertCalendrier: async (data: Parameters<typeof pedagogieService.upsertCalendrier>[0], token: string) => {
+    requireAcademicAccess(token)
+    return mutate(() => pedagogieService.upsertCalendrier(data, userId(token)))
+  },
+  deleteCalendrier: async (id: number, token: string) => {
+    requireAcademicAccess(token)
+    return mutate(() => pedagogieService.deleteCalendrier(id, userId(token)))
+  },
+
+  listAffectations: async (anneeId: number) => pedagogieService.listAffectations(anneeId),
+  upsertAffectation: async (
+    data: Parameters<typeof pedagogieService.upsertAffectation>[0],
+    token: string
+  ) => {
+    requireAcademicAccess(token)
+    return mutate(() => pedagogieService.upsertAffectation(data, userId(token)))
+  },
+  deleteAffectation: async (id: number, token: string) => {
+    requireAcademicAccess(token)
+    return mutate(() => pedagogieService.deleteAffectation(id, userId(token)))
+  },
+  listEmploiDuTemps: async (classeId: number) => pedagogieService.listEmploiDuTemps(classeId),
+  upsertEmploiDuTemps: async (
+    data: Parameters<typeof pedagogieService.upsertEmploiDuTemps>[0],
+    token: string
+  ) => {
+    requireAcademicAccess(token)
+    return mutate(() => pedagogieService.upsertEmploiDuTemps(data, userId(token)))
+  },
+  deleteEmploiDuTemps: async (id: number, token: string) => {
+    requireAcademicAccess(token)
+    return mutate(() => pedagogieService.deleteEmploiDuTemps(id, userId(token)))
+  },
+
+  listEcheancier: async (anneeId: number, fraisId?: number) =>
+    financesService.listEcheancier(anneeId, fraisId),
+  upsertEcheance: async (data: Parameters<typeof financesService.upsertEcheance>[0], token: string) => {
+    requireFinanceAccess(token)
+    return mutate(() => financesService.upsertEcheance(data, userId(token)))
+  },
+  deleteEcheance: async (id: number, token: string) => {
+    requireFinanceAccess(token)
+    return mutate(() => financesService.deleteEcheance(id, userId(token)))
+  },
+
+  getBackupSettings: async (token: string) => {
+    requireDirector(token)
+    return getBackupSettings()
+  },
+  setBackupSettings: async (data: { enabled?: boolean; directory?: string }, token: string) => {
+    requireDirector(token)
+    if (typeof data.enabled === 'boolean') setBackupEnabled(data.enabled)
+    if (data.directory) setBackupDirectory(data.directory)
+    await flushDatabase()
+    return getBackupSettings()
+  },
+  chooseBackupDirectory: async (token: string) => {
+    requireDirector(token)
+    return 'Téléchargements du navigateur'
+  },
+  runAutoBackup: async (force: boolean, token: string) => {
+    requireDirector(token)
+    const settings = getBackupSettings()
+    const today = new Date().toISOString().slice(0, 10)
+    if (!force && !settings.enabled) return { ran: false }
+    if (!force && settings.lastDate === today) return { ran: false }
+    const filename = `tchikong-${today}.db`
+    downloadBytes(await exportDatabase(), filename, 'application/x-sqlite3')
+    markBackupDone(today)
+    await flushDatabase()
+    return { ran: true, path: filename }
   }
 }
 
@@ -515,4 +620,12 @@ export async function installBrowserApi(): Promise<void> {
   seedReferenceData()
   await flushDatabase()
   window.api = browserApi
+  const settings = getBackupSettings()
+  const today = new Date().toISOString().slice(0, 10)
+  if (settings.enabled && settings.lastDate !== today) {
+    const filename = `tchikong-${today}.db`
+    downloadBytes(await exportDatabase(), filename, 'application/x-sqlite3')
+    markBackupDone(today)
+    await flushDatabase()
+  }
 }

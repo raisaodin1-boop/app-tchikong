@@ -7,7 +7,13 @@ import type {
   Inscription,
   ParentTuteur,
   PresenceEleve,
-  PresenceJourData
+  PresenceJourData,
+  DocumentEleve,
+  TypeDocument,
+  CandidatPassage,
+  DecisionPassage,
+  LignePassage,
+  PassageResult
 } from '../../../shared/types'
 
 function generateMatricule(): string {
@@ -119,6 +125,7 @@ export function getEleve(id: number, anneeScolaireId?: number): {
   inscription: Inscription | null
   parents: ParentTuteur[]
   historique: HistoriqueEleve[]
+  documents: DocumentEleve[]
 } | null {
   const eleve = getDb().prepare('SELECT * FROM eleves WHERE id = ?').get(id) as Eleve | undefined
   if (!eleve) return null
@@ -157,7 +164,9 @@ export function getEleve(id: number, anneeScolaireId?: number): {
     .prepare('SELECT * FROM historique_eleves WHERE eleve_id = ? ORDER BY date_evenement DESC')
     .all(id) as HistoriqueEleve[]
 
-  return { eleve, inscription, parents, historique }
+  const documents = listDocumentsEleve(id)
+
+  return { eleve, inscription, parents, historique, documents }
 }
 
 export function createEleve(data: EleveFormData, userId?: number): Eleve {
@@ -412,3 +421,305 @@ export function changeStatutEleve(
 export function searchEleves(term: string, anneeScolaireId?: number): Inscription[] {
   return listEleves({ recherche: term, annee_scolaire_id: anneeScolaireId })
 }
+
+const MAX_FILE_CHARS = 8_000_000
+
+function assertDataUrl(contenu: string, kind: 'photo' | 'document'): void {
+  if (!contenu.startsWith('data:')) throw new Error('Fichier invalide')
+  if (contenu.length > MAX_FILE_CHARS) {
+    throw new Error('Fichier trop volumineux (maximum 6 Mo environ)')
+  }
+  if (kind === 'photo' && !/^data:image\/(jpeg|jpg|png|webp|gif)/i.test(contenu)) {
+    throw new Error('La photo doit être une image (JPG, PNG ou WebP)')
+  }
+}
+
+export function listDocumentsEleve(eleveId: number): DocumentEleve[] {
+  return getDb()
+    .prepare('SELECT * FROM documents_eleves WHERE eleve_id = ? ORDER BY uploaded_at DESC')
+    .all(eleveId) as DocumentEleve[]
+}
+
+export function addDocumentEleve(
+  eleveId: number,
+  data: { type: TypeDocument; nom_fichier: string; contenu: string },
+  userId?: number
+): DocumentEleve {
+  const db = getDb()
+  if (!db.prepare('SELECT id FROM eleves WHERE id = ?').get(eleveId)) {
+    throw new Error('Élève introuvable')
+  }
+  assertDataUrl(data.contenu, 'document')
+  const result = db
+    .prepare(
+      `INSERT INTO documents_eleves (eleve_id, type, nom_fichier, chemin)
+       VALUES (?, ?, ?, ?)`
+    )
+    .run(eleveId, data.type, data.nom_fichier.trim() || 'document', data.contenu)
+  logActivity(userId ?? null, 'ajout', 'document_eleve', eleveId, data.nom_fichier)
+  return db
+    .prepare('SELECT * FROM documents_eleves WHERE id = ?')
+    .get(result.lastInsertRowid) as DocumentEleve
+}
+
+export function deleteDocumentEleve(id: number, userId?: number): boolean {
+  const db = getDb()
+  const row = db.prepare('SELECT eleve_id, nom_fichier FROM documents_eleves WHERE id = ?').get(id) as
+    | { eleve_id: number; nom_fichier: string }
+    | undefined
+  if (!row) throw new Error('Document introuvable')
+  db.prepare('DELETE FROM documents_eleves WHERE id = ?').run(id)
+  logActivity(userId ?? null, 'suppression', 'document_eleve', row.eleve_id, row.nom_fichier)
+  return true
+}
+
+export function setElevePhoto(eleveId: number, contenu: string | null, userId?: number): Eleve {
+  const db = getDb()
+  const eleve = db.prepare('SELECT * FROM eleves WHERE id = ?').get(eleveId) as Eleve | undefined
+  if (!eleve) throw new Error('Élève introuvable')
+  if (contenu) assertDataUrl(contenu, 'photo')
+  db.prepare(
+    `UPDATE eleves SET photo_path = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(contenu, eleveId)
+  logActivity(userId ?? null, 'modification', 'eleve', eleveId, contenu ? 'photo' : 'photo_supprimee')
+  return db.prepare('SELECT * FROM eleves WHERE id = ?').get(eleveId) as Eleve
+}
+
+function findCibleClass(
+  source: {
+    niveau_id: number
+    section_id: number
+    nom: string
+    ordre: number
+  },
+  targetAnneeId: number,
+  decision: DecisionPassage
+): { id: number; nom: string } | null {
+  const db = getDb()
+  const niveaux = db
+    .prepare('SELECT id, ordre FROM niveaux WHERE section_id = ? ORDER BY ordre')
+    .all(source.section_id) as { id: number; ordre: number }[]
+  let targetNiveauId = source.niveau_id
+  if (decision === 'admission') {
+    const next = niveaux.find((n) => n.ordre === source.ordre + 1)
+    if (!next) return null
+    targetNiveauId = next.id
+  }
+  const classes = db
+    .prepare(
+      `SELECT id, nom FROM classes
+       WHERE annee_scolaire_id = ? AND section_id = ? AND niveau_id = ?
+       ORDER BY nom`
+    )
+    .all(targetAnneeId, source.section_id, targetNiveauId) as { id: number; nom: string }[]
+  if (classes.length === 0) return null
+  return classes.find((c) => c.nom === source.nom) ?? classes[0]
+}
+
+export function listCandidatsPassage(
+  anneeSourceId: number,
+  anneeCibleId: number
+): CandidatPassage[] {
+  if (anneeSourceId === anneeCibleId) {
+    throw new Error("Choisissez l'année précédente et la nouvelle année")
+  }
+  const db = getDb()
+  const rows = db
+    .prepare(
+      `SELECT i.eleve_id, e.nom, e.prenom, e.matricule,
+              i.classe_id as classe_source_id, c.nom as classe_source_nom,
+              i.niveau_id, n.nom as niveau_nom, n.ordre as niveau_ordre,
+              i.section_id, s.code as section_code,
+              (SELECT ic.id FROM inscriptions ic
+                WHERE ic.eleve_id = i.eleve_id AND ic.annee_scolaire_id = ?) as inscription_cible
+       FROM inscriptions i
+       JOIN eleves e ON e.id = i.eleve_id
+       JOIN classes c ON c.id = i.classe_id
+       JOIN niveaux n ON n.id = i.niveau_id
+       JOIN sections s ON s.id = i.section_id
+       WHERE i.annee_scolaire_id = ? AND i.statut = 'actif' AND e.statut = 'actif'
+       ORDER BY s.code, n.ordre, c.nom, e.nom, e.prenom`
+    )
+    .all(anneeCibleId, anneeSourceId) as {
+    eleve_id: number
+    nom: string
+    prenom: string
+    matricule: string
+    classe_source_id: number
+    classe_source_nom: string
+    niveau_id: number
+    niveau_nom: string
+    niveau_ordre: number
+    section_id: number
+    section_code: CandidatPassage['section_code']
+    inscription_cible: number | null
+  }[]
+
+  return rows.map((row) => {
+    const lastOfCycle = !findCibleClass(
+      {
+        niveau_id: row.niveau_id,
+        section_id: row.section_id,
+        nom: row.classe_source_nom,
+        ordre: row.niveau_ordre
+      },
+      anneeCibleId,
+      'admission'
+    )
+    const decision: DecisionPassage = lastOfCycle ? 'diplome' : 'admission'
+    const cible =
+      decision === 'admission'
+        ? findCibleClass(
+            {
+              niveau_id: row.niveau_id,
+              section_id: row.section_id,
+              nom: row.classe_source_nom,
+              ordre: row.niveau_ordre
+            },
+            anneeCibleId,
+            'admission'
+          )
+        : null
+    return {
+      eleve_id: row.eleve_id,
+      nom: row.nom,
+      prenom: row.prenom,
+      matricule: row.matricule,
+      classe_source_id: row.classe_source_id,
+      classe_source_nom: row.classe_source_nom,
+      niveau_id: row.niveau_id,
+      niveau_nom: row.niveau_nom,
+      section_id: row.section_id,
+      section_code: row.section_code,
+      decision_suggeree: decision,
+      classe_cible_id: cible?.id ?? null,
+      classe_cible_nom: cible?.nom ?? null,
+      deja_inscrit: Boolean(row.inscription_cible)
+    }
+  })
+}
+
+export function inscrirePassage(
+  anneeSourceId: number,
+  anneeCibleId: number,
+  lignes: LignePassage[],
+  userId?: number
+): PassageResult {
+  const result: PassageResult = {
+    inscrits: 0,
+    redoublants: 0,
+    transferes: 0,
+    diplomes: 0,
+    erreurs: []
+  }
+  const db = getDb()
+  const run = db.transaction(() => {
+    for (const ligne of lignes) {
+      try {
+        const source = db
+          .prepare(
+            `SELECT i.*, n.ordre as niveau_ordre, c.nom as classe_nom
+             FROM inscriptions i
+             JOIN niveaux n ON n.id = i.niveau_id
+             JOIN classes c ON c.id = i.classe_id
+             WHERE i.eleve_id = ? AND i.annee_scolaire_id = ?`
+          )
+          .get(ligne.eleve_id, anneeSourceId) as
+          | {
+              eleve_id: number
+              classe_id: number
+              section_id: number
+              niveau_id: number
+              niveau_ordre: number
+              classe_nom: string
+            }
+          | undefined
+        if (!source) throw new Error("Inscription d'origine introuvable")
+
+        if (ligne.decision === 'transfert' || ligne.decision === 'diplome') {
+          const statut = ligne.decision === 'transfert' ? 'transfere' : 'diplome'
+          db.prepare(
+            `UPDATE eleves SET statut = ?, updated_at = datetime('now') WHERE id = ?`
+          ).run(statut, ligne.eleve_id)
+          db.prepare(
+            `UPDATE inscriptions SET statut = ? WHERE eleve_id = ? AND annee_scolaire_id = ?`
+          ).run(statut, ligne.eleve_id, anneeSourceId)
+          db.prepare(
+            `INSERT INTO historique_eleves (eleve_id, annee_scolaire_id, type, description, date_evenement)
+             VALUES (?, ?, ?, ?, date('now'))`
+          ).run(
+            ligne.eleve_id,
+            anneeSourceId,
+            ligne.decision === 'transfert' ? 'transfert_sortant' : 'changement_classe',
+            ligne.decision === 'transfert' ? 'Transfert sortant' : 'Fin de cycle / diplômé'
+          )
+          if (ligne.decision === 'transfert') result.transferes += 1
+          else result.diplomes += 1
+          continue
+        }
+
+        const existing = db
+          .prepare(
+            'SELECT id FROM inscriptions WHERE eleve_id = ? AND annee_scolaire_id = ?'
+          )
+          .get(ligne.eleve_id, anneeCibleId)
+        if (existing) throw new Error('Déjà inscrit dans la nouvelle année')
+
+        let classeId = ligne.classe_id
+        if (!classeId) {
+          const cible = findCibleClass(
+            {
+              niveau_id: source.niveau_id,
+              section_id: source.section_id,
+              nom: source.classe_nom,
+              ordre: source.niveau_ordre
+            },
+            anneeCibleId,
+            ligne.decision
+          )
+          classeId = cible?.id
+        }
+        if (!classeId) throw new Error('Aucune classe cible disponible')
+        const classe = validateEnrollmentClass(anneeCibleId, classeId)
+        db.prepare(
+          `INSERT INTO inscriptions
+            (eleve_id, annee_scolaire_id, classe_id, section_id, niveau_id, redoublement, statut)
+           VALUES (?, ?, ?, ?, ?, ?, 'actif')`
+        ).run(
+          ligne.eleve_id,
+          anneeCibleId,
+          classeId,
+          classe.section_id,
+          classe.niveau_id,
+          ligne.decision === 'redoublement' ? 1 : 0
+        )
+        db.prepare(
+          `INSERT INTO historique_eleves (eleve_id, annee_scolaire_id, type, description, date_evenement)
+           VALUES (?, ?, ?, ?, date('now'))`
+        ).run(
+          ligne.eleve_id,
+          anneeCibleId,
+          ligne.decision === 'redoublement' ? 'redoublement' : 'changement_classe',
+          ligne.decision === 'redoublement' ? 'Redoublement' : 'Admission dans la classe supérieure'
+        )
+        if (ligne.decision === 'redoublement') result.redoublants += 1
+        else result.inscrits += 1
+      } catch (error) {
+        result.erreurs.push({
+          eleve_id: ligne.eleve_id,
+          message: error instanceof Error ? error.message : 'Erreur'
+        })
+      }
+    }
+    logActivity(
+      userId ?? null,
+      'passage_annee',
+      'annee_scolaire',
+      anneeCibleId,
+      `${result.inscrits} admissions, ${result.redoublants} redoublements`
+    )
+  })
+  run()
+  return result
+}
+

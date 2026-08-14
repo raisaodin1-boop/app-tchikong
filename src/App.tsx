@@ -12,6 +12,7 @@ import ScolaritePage from './pages/scolarite/ScolaritePage'
 import NotesSaisiePage from './pages/scolarite/NotesSaisiePage'
 import BulletinsPage from './pages/scolarite/BulletinsPage'
 import PalmaresPage from './pages/scolarite/PalmaresPage'
+import EmploiDuTempsPage from './pages/scolarite/EmploiDuTempsPage'
 import FinancesPage from './pages/finances/FinancesPage'
 import FinancesDashboardPage from './pages/finances/FinancesDashboardPage'
 import PaiementPage from './pages/finances/PaiementPage'
@@ -19,6 +20,7 @@ import HistoriquePage from './pages/finances/HistoriquePage'
 import ImpayesPage from './pages/finances/ImpayesPage'
 import DepensesPage from './pages/finances/DepensesPage'
 import BilanAnnuelPage from './pages/finances/BilanAnnuelPage'
+import EcheancierPage from './pages/finances/EcheancierPage'
 import AdminPage from './pages/admin/AdminPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import PersonnelPage from './pages/admin/PersonnelPage'
@@ -29,6 +31,9 @@ import PaiePersonnelPage from './pages/admin/PaiePersonnelPage'
 import UtilisateursPage from './pages/admin/UtilisateursPage'
 import DocumentsPage from './pages/admin/DocumentsPage'
 import JournalPage from './pages/admin/JournalPage'
+import PassageAnneePage from './pages/admin/PassageAnneePage'
+import CalendrierPage from './pages/admin/CalendrierPage'
+import MaintenancePage from './pages/admin/MaintenancePage'
 import LoadingScreen from './components/ui/LoadingScreen'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -123,6 +128,7 @@ export default function App() {
           <Route path="notes" element={<NotesSaisiePage />} />
           <Route path="bulletins" element={<BulletinsPage />} />
           <Route path="palmares" element={<PalmaresPage />} />
+          <Route path="emploi-du-temps" element={<EmploiDuTempsPage />} />
         </Route>
         <Route
           path="finances"
@@ -138,6 +144,7 @@ export default function App() {
           <Route path="impayes" element={<ImpayesPage />} />
           <Route path="depenses" element={<DepensesPage />} />
           <Route path="bilan" element={<BilanAnnuelPage />} />
+          <Route path="echeancier" element={<EcheancierPage />} />
         </Route>
         <Route
           path="admin"
@@ -150,6 +157,8 @@ export default function App() {
           <Route index element={<AdminDashboardPage />} />
           <Route path="personnel" element={<PersonnelPage />} />
           <Route path="classes" element={<ClassesPage />} />
+          <Route path="passage" element={<PassageAnneePage />} />
+          <Route path="calendrier" element={<CalendrierPage />} />
           <Route
             path="frais"
             element={
@@ -177,6 +186,14 @@ export default function App() {
           <Route path="utilisateurs" element={<UtilisateursPage />} />
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="journal" element={<JournalPage />} />
+          <Route
+            path="maintenance"
+            element={
+              <DirectriceRoute>
+                <MaintenancePage />
+              </DirectriceRoute>
+            }
+          />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

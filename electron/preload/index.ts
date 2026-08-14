@@ -189,7 +189,7 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DASHBOARD, anneeId),
   getSituationFinanciere: (eleveId: number, anneeId: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_SITUATION, eleveId, anneeId),
-  listFraisConfigurations: (anneeId: number) =>
+  listFraisConfigurations: (anneeId: number): Promise<import('../../shared/types').FraisConfiguration[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE, anneeId),
   upsertFraisConfiguration: (
     data: import('../../shared/types').FraisConfigurationFormData,
@@ -272,7 +272,62 @@ const api = {
     confirmation: string,
     token: string
   ): Promise<import('../../shared/types').DemoResetResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_DEMO_EXIT, confirmation, token)
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_DEMO_EXIT, confirmation, token),
+
+  listDocumentsEleve: (eleveId: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ELEVE_DOCUMENTS_LIST, eleveId),
+  addDocumentEleve: (
+    eleveId: number,
+    data: { type: import('../../shared/types').TypeDocument; nom_fichier: string; contenu: string },
+    token: string
+  ) => ipcRenderer.invoke(IPC_CHANNELS.ELEVE_DOCUMENT_ADD, eleveId, data, token),
+  deleteDocumentEleve: (id: number, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ELEVE_DOCUMENT_DELETE, id, token),
+  setElevePhoto: (eleveId: number, contenu: string | null, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ELEVE_PHOTO_SET, eleveId, contenu, token),
+  listCandidatsPassage: (
+    anneeSourceId: number,
+    anneeCibleId: number
+  ): Promise<import('../../shared/types').CandidatPassage[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PASSAGE_CANDIDATS, anneeSourceId, anneeCibleId),
+  inscrirePassage: (
+    anneeSourceId: number,
+    anneeCibleId: number,
+    lignes: import('../../shared/types').LignePassage[],
+    token: string
+  ) => ipcRenderer.invoke(IPC_CHANNELS.PASSAGE_INSCRIRE, anneeSourceId, anneeCibleId, lignes, token),
+
+  listCalendrier: (anneeId: number) => ipcRenderer.invoke(IPC_CHANNELS.CALENDRIER_LIST, anneeId),
+  upsertCalendrier: (data: object, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CALENDRIER_UPSERT, data, token),
+  deleteCalendrier: (id: number, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CALENDRIER_DELETE, id, token),
+
+  listAffectations: (anneeId: number) => ipcRenderer.invoke(IPC_CHANNELS.AFFECTATION_LIST, anneeId),
+  upsertAffectation: (data: object, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AFFECTATION_UPSERT, data, token),
+  deleteAffectation: (id: number, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AFFECTATION_DELETE, id, token),
+  listEmploiDuTemps: (classeId: number) => ipcRenderer.invoke(IPC_CHANNELS.EMPLOI_LIST, classeId),
+  upsertEmploiDuTemps: (data: object, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.EMPLOI_UPSERT, data, token),
+  deleteEmploiDuTemps: (id: number, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.EMPLOI_DELETE, id, token),
+
+  listEcheancier: (anneeId: number, fraisId?: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ECHEANCIER_LIST, anneeId, fraisId),
+  upsertEcheance: (data: object, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ECHEANCIER_UPSERT, data, token),
+  deleteEcheance: (id: number, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ECHEANCIER_DELETE, id, token),
+
+  getBackupSettings: (token: string) => ipcRenderer.invoke(IPC_CHANNELS.BACKUP_SETTINGS_GET, token),
+  setBackupSettings: (data: { enabled?: boolean; directory?: string }, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BACKUP_SETTINGS_SET, data, token),
+  chooseBackupDirectory: (token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BACKUP_CHOOSE_DIR, token),
+  runAutoBackup: (force: boolean, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BACKUP_RUN_AUTO, force, token)
 }
 
 contextBridge.exposeInMainWorld('api', api)

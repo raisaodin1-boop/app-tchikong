@@ -2,6 +2,8 @@ import { getDb, logActivity } from '@database'
 import type {
   BilanAnnuel,
   Depense,
+  EcheanceDetail,
+  EcheancierPaiement,
   FraisConfiguration,
   FraisConfigurationFormData,
   ModePaiement,
@@ -350,7 +352,8 @@ export function getSituationFinanciere(
       libelle: item.libelle,
       montant_du: item.montant,
       montant_paye: paye,
-      reste: Math.max(0, item.montant - paye)
+      reste: Math.max(0, item.montant - paye),
+      echeances: buildEcheances(anneeScolaireId, item.frais_modele_id, item.montant, paye)
     }
   })
 
@@ -885,4 +888,135 @@ function maxDate(value: string | null, fallback: string): string {
 
 function minDate(value: string | null, fallback: string): string {
   return value && value < fallback ? value : fallback
+}
+
+function buildEcheances(
+  anneeScolaireId: number,
+  fraisModeleId: number,
+  montantDu: number,
+  montantPaye: number
+): EcheanceDetail[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM echeancier_paiements
+       WHERE annee_scolaire_id = ? AND (frais_modele_id = ? OR frais_modele_id IS NULL)
+       ORDER BY date_limite, id`
+    )
+    .all(anneeScolaireId, fraisModeleId) as EcheancierPaiement[]
+  const forModule = rows.filter((row) => row.frais_modele_id === fraisModeleId)
+  const echeances = forModule.length > 0 ? forModule : rows.filter((row) => row.frais_modele_id == null)
+  if (echeances.length === 0) return []
+
+  const today = new Date().toISOString().slice(0, 10)
+  let remainingPaid = montantPaye
+  return echeances.map((row) => {
+    const due = Math.round((montantDu * row.pourcentage) / 100)
+    const applied = Math.min(due, remainingPaid)
+    remainingPaid = Math.max(0, remainingPaid - applied)
+    const reste = Math.max(0, due - applied)
+    let statut: EcheanceDetail['statut'] = 'a_venir'
+    if (reste === 0) statut = 'payee'
+    else if (row.date_limite < today) statut = 'en_retard'
+    else if (row.date_limite === today) statut = 'due'
+    return {
+      id: row.id,
+      libelle: row.libelle,
+      date_limite: row.date_limite,
+      pourcentage: row.pourcentage,
+      montant_du: due,
+      montant_paye: applied,
+      reste,
+      statut
+    }
+  })
+}
+
+export function listEcheancier(anneeScolaireId: number, fraisModeleId?: number): EcheancierPaiement[] {
+  if (fraisModeleId) {
+    return getDb()
+      .prepare(
+        `SELECT * FROM echeancier_paiements
+         WHERE annee_scolaire_id = ? AND frais_modele_id = ?
+         ORDER BY date_limite, id`
+      )
+      .all(anneeScolaireId, fraisModeleId) as EcheancierPaiement[]
+  }
+  return getDb()
+    .prepare(
+      `SELECT * FROM echeancier_paiements
+       WHERE annee_scolaire_id = ?
+       ORDER BY date_limite, id`
+    )
+    .all(anneeScolaireId) as EcheancierPaiement[]
+}
+
+export function upsertEcheance(
+  data: {
+    id?: number
+    annee_scolaire_id: number
+    frais_modele_id: number
+    libelle: string
+    date_limite: string
+    pourcentage: number
+  },
+  userId?: number
+): EcheancierPaiement {
+  if (!data.libelle.trim()) throw new Error('Le libellé de la tranche est requis')
+  if (!data.date_limite) throw new Error('La date limite est requise')
+  if (!Number.isFinite(data.pourcentage) || data.pourcentage <= 0 || data.pourcentage > 100) {
+    throw new Error('Le pourcentage doit être compris entre 0 et 100')
+  }
+  const db = getDb()
+  const model = db
+    .prepare('SELECT id FROM frais_modeles WHERE id = ? AND annee_scolaire_id = ?')
+    .get(data.frais_modele_id, data.annee_scolaire_id)
+  if (!model) throw new Error('Module de frais introuvable pour cette année')
+
+  const others = db
+    .prepare(
+      `SELECT COALESCE(SUM(pourcentage), 0) as total FROM echeancier_paiements
+       WHERE annee_scolaire_id = ? AND frais_modele_id = ? AND id != ?`
+    )
+    .get(data.annee_scolaire_id, data.frais_modele_id, data.id ?? 0) as { total: number }
+  if (others.total + data.pourcentage > 100.01) {
+    throw new Error('Le total des tranches ne peut pas dépasser 100 %')
+  }
+
+  if (data.id) {
+    db.prepare(
+      `UPDATE echeancier_paiements
+       SET libelle = ?, date_limite = ?, pourcentage = ?, frais_modele_id = ?
+       WHERE id = ?`
+    ).run(data.libelle.trim(), data.date_limite, data.pourcentage, data.frais_modele_id, data.id)
+    logActivity(userId ?? null, 'modification', 'echeancier', data.id, data.libelle)
+    return db.prepare('SELECT * FROM echeancier_paiements WHERE id = ?').get(data.id) as EcheancierPaiement
+  }
+  const result = db
+    .prepare(
+      `INSERT INTO echeancier_paiements
+        (annee_scolaire_id, libelle, date_limite, pourcentage, frais_modele_id)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(
+      data.annee_scolaire_id,
+      data.libelle.trim(),
+      data.date_limite,
+      data.pourcentage,
+      data.frais_modele_id
+    )
+  logActivity(userId ?? null, 'creation', 'echeancier', Number(result.lastInsertRowid), data.libelle)
+  return db
+    .prepare('SELECT * FROM echeancier_paiements WHERE id = ?')
+    .get(result.lastInsertRowid) as EcheancierPaiement
+}
+
+export function deleteEcheance(id: number, userId?: number): boolean {
+  const db = getDb()
+  const row = db.prepare('SELECT libelle FROM echeancier_paiements WHERE id = ?').get(id) as
+    | { libelle: string }
+    | undefined
+  if (!row) throw new Error('Tranche introuvable')
+  db.prepare('DELETE FROM echeancier_paiements WHERE id = ?').run(id)
+  logActivity(userId ?? null, 'suppression', 'echeancier', id, row.libelle)
+  return true
 }

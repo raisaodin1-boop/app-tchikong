@@ -323,6 +323,68 @@ export interface EcheancierPaiement {
   libelle: string
   date_limite: string
   pourcentage: number
+  frais_modele_id: number | null
+}
+
+export type DecisionPassage = 'admission' | 'redoublement' | 'transfert' | 'diplome'
+
+export interface CandidatPassage {
+  eleve_id: number
+  nom: string
+  prenom: string
+  matricule: string
+  classe_source_id: number
+  classe_source_nom: string
+  niveau_id: number
+  niveau_nom: string
+  section_id: number
+  section_code: SectionCode
+  decision_suggeree: DecisionPassage
+  classe_cible_id: number | null
+  classe_cible_nom: string | null
+  deja_inscrit: boolean
+}
+
+export interface LignePassage {
+  eleve_id: number
+  decision: DecisionPassage
+  classe_id?: number
+}
+
+export interface PassageResult {
+  inscrits: number
+  redoublants: number
+  transferes: number
+  diplomes: number
+  erreurs: { eleve_id: number; message: string }[]
+}
+
+export interface EcheanceDetail {
+  id: number
+  libelle: string
+  date_limite: string
+  pourcentage: number
+  montant_du: number
+  montant_paye: number
+  reste: number
+  statut: 'a_venir' | 'due' | 'payee' | 'en_retard'
+}
+
+export interface BackupSettings {
+  enabled: boolean
+  directory: string | null
+  lastDate: string | null
+}
+
+export interface EmploiDuTempsDetail extends EmploiDuTemps {
+  matiere_nom: string
+  enseignant_nom: string | null
+}
+
+export interface AffectationDetail extends AffectationEnseignant {
+  enseignant_nom: string
+  classe_nom: string
+  matiere_nom: string
 }
 
 export interface Paiement {
@@ -485,6 +547,7 @@ export interface SituationFinanciere {
     montant_du: number
     montant_paye: number
     reste: number
+    echeances?: EcheanceDetail[]
   }[]
 }
 
@@ -905,5 +968,28 @@ export const IPC_CHANNELS = {
   ADMIN_DOCUMENT_LIST: 'admin:documentList',
   ADMIN_JOURNAL_LIST: 'admin:journalList',
   ADMIN_DEMO_STATUS: 'admin:demoStatus',
-  ADMIN_DEMO_EXIT: 'admin:demoExit'
+  ADMIN_DEMO_EXIT: 'admin:demoExit',
+
+  ELEVE_DOCUMENTS_LIST: 'eleve:documentsList',
+  ELEVE_DOCUMENT_ADD: 'eleve:documentAdd',
+  ELEVE_DOCUMENT_DELETE: 'eleve:documentDelete',
+  ELEVE_PHOTO_SET: 'eleve:photoSet',
+  PASSAGE_CANDIDATS: 'passage:candidats',
+  PASSAGE_INSCRIRE: 'passage:inscrire',
+  CALENDRIER_LIST: 'calendrier:list',
+  CALENDRIER_UPSERT: 'calendrier:upsert',
+  CALENDRIER_DELETE: 'calendrier:delete',
+  AFFECTATION_LIST: 'affectation:list',
+  AFFECTATION_UPSERT: 'affectation:upsert',
+  AFFECTATION_DELETE: 'affectation:delete',
+  EMPLOI_LIST: 'emploi:list',
+  EMPLOI_UPSERT: 'emploi:upsert',
+  EMPLOI_DELETE: 'emploi:delete',
+  ECHEANCIER_LIST: 'echeancier:list',
+  ECHEANCIER_UPSERT: 'echeancier:upsert',
+  ECHEANCIER_DELETE: 'echeancier:delete',
+  BACKUP_SETTINGS_GET: 'backup:settingsGet',
+  BACKUP_SETTINGS_SET: 'backup:settingsSet',
+  BACKUP_CHOOSE_DIR: 'backup:chooseDir',
+  BACKUP_RUN_AUTO: 'backup:runAuto'
 } as const

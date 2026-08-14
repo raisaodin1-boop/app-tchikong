@@ -52,9 +52,9 @@ export default function AnneesScolairesPage() {
       const result = await window.api.startNewAnnee(form, token)
       await refreshData()
       alert(
-        `${result.annee.libelle} démarrée. ${result.classes_copiees} classes copiées. Configurez maintenant tous les modules à payer.`
+        `${result.annee.libelle} démarrée. ${result.classes_copiees} classes copiées. Configurez les frais, puis inscrivez les élèves via Passage d'année.`
       )
-      navigate('/admin/frais')
+      navigate('/admin/passage')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Impossible de démarrer l'année")
     } finally {

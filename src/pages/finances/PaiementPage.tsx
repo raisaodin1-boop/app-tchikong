@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { Search, Save, Printer, CheckCircle } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -223,14 +223,29 @@ export default function PaiementPage() {
             </thead>
             <tbody>
               {situation.details.map((d) => (
-                <tr key={d.frais_modele_id} className="border-t border-gray-100">
-                  <td className="py-1.5">{d.libelle}</td>
-                  <td className="py-1.5 text-right">{formatMoney(d.montant_du)}</td>
-                  <td className="py-1.5 text-right text-accent-green">{formatMoney(d.montant_paye)}</td>
-                  <td className={`py-1.5 text-right font-medium ${d.reste > 0 ? 'text-accent-red' : ''}`}>
-                    {formatMoney(d.reste)}
-                  </td>
-                </tr>
+                <Fragment key={d.frais_modele_id}>
+                  <tr className="border-t border-gray-100">
+                    <td className="py-1.5">{d.libelle}</td>
+                    <td className="py-1.5 text-right">{formatMoney(d.montant_du)}</td>
+                    <td className="py-1.5 text-right text-accent-green">{formatMoney(d.montant_paye)}</td>
+                    <td className={`py-1.5 text-right font-medium ${d.reste > 0 ? 'text-accent-red' : ''}`}>
+                      {formatMoney(d.reste)}
+                    </td>
+                  </tr>
+                  {d.echeances?.map((echeance) => (
+                    <tr key={echeance.id} className="text-xs text-gray-500">
+                      <td className="pl-4 py-1">
+                        {echeance.libelle} ({echeance.date_limite})
+                        {echeance.statut === 'en_retard' ? ' — en retard' : ''}
+                      </td>
+                      <td className="text-right">{formatMoney(echeance.montant_du)}</td>
+                      <td className="text-right">{formatMoney(echeance.montant_paye)}</td>
+                      <td className={`text-right ${echeance.reste > 0 ? 'text-accent-red' : ''}`}>
+                        {formatMoney(echeance.reste)}
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

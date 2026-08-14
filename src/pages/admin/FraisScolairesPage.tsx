@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
 import type {
-  DemoStatus,
   FraisConfiguration,
   FraisConfigurationFormData,
   ModeTarification,
@@ -35,23 +34,15 @@ export default function FraisScolairesPage() {
   const { user, token } = useAuth()
   const { anneeActive, classes } = useApp()
   const [configurations, setConfigurations] = useState<FraisConfiguration[]>([])
-  const [demoStatus, setDemoStatus] = useState<DemoStatus | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [copyAmount, setCopyAmount] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [confirmation, setConfirmation] = useState('')
-  const [resetting, setResetting] = useState(false)
 
   const load = async () => {
     if (!anneeActive || !token || user?.role !== 'directrice') return
-    const [fees, status] = await Promise.all([
-      window.api.listFraisConfigurations(anneeActive.id),
-      window.api.getDemoStatus(token)
-    ])
-    setConfigurations(fees)
-    setDemoStatus(status)
+    setConfigurations(await window.api.listFraisConfigurations(anneeActive.id))
   }
 
   useEffect(() => {
@@ -138,34 +129,6 @@ export default function FraisScolairesPage() {
       await load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'La suppression a échoué')
-    }
-  }
-
-  const backup = async () => {
-    const result = await window.api.backupDb()
-    if (result.success) alert(`Sauvegarde téléchargée : ${result.path}`)
-  }
-
-  const exitDemo = async () => {
-    if (!token || confirmation !== 'QUITTER DEMO') return
-    if (
-      !confirm(
-        'Dernière confirmation : toutes les données fictives seront définitivement supprimées. Continuer ?'
-      )
-    ) {
-      return
-    }
-    setResetting(true)
-    setError('')
-    try {
-      const result = await window.api.exitDemoMode(confirmation, token)
-      alert(
-        `Mode démo quitté : ${result.deleted.eleves} élèves, ${result.deleted.paiements} paiements et ${result.deleted.personnel} personnels fictifs supprimés.`
-      )
-      window.location.reload()
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'La sortie du mode démo a échoué')
-      setResetting(false)
     }
   }
 
@@ -371,50 +334,6 @@ export default function FraisScolairesPage() {
           ))
         )}
       </div>
-
-      <section className="card border border-red-200 p-5">
-        <div className="flex gap-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-          <div className="flex-1">
-            <h2 className="font-semibold text-red-800">Mode démonstration</h2>
-            {demoStatus?.active ? (
-              <>
-                <p className="mt-1 text-sm text-gray-600">
-                  {demoStatus.eleves} élèves fictifs sont présents. Les comptes, référentiels,
-                  année scolaire et classes seront conservés.
-                </p>
-                <button type="button" className="btn-secondary btn-sm mt-3" onClick={backup}>
-                  <Save className="h-4 w-4" />
-                  Sauvegarder avant de continuer
-                </button>
-                <div className="mt-4 max-w-md">
-                  <label className="label">
-                    Saisissez <strong>QUITTER DEMO</strong> pour confirmer
-                  </label>
-                  <input
-                    className="input"
-                    value={confirmation}
-                    onChange={(event) => setConfirmation(event.target.value)}
-                    autoComplete="off"
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                  onClick={exitDemo}
-                  disabled={confirmation !== 'QUITTER DEMO' || resetting}
-                >
-                  {resetting ? 'Suppression...' : 'Quitter le mode démo'}
-                </button>
-              </>
-            ) : (
-              <p className="mt-1 text-sm font-medium text-green-700">
-                Le mode démonstration est désactivé.
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
     </div>
   )
 }

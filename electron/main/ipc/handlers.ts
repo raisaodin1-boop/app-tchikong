@@ -9,6 +9,9 @@ import * as documentsService from '../services/documents'
 import * as financesService from '../services/finances'
 import * as adminService from '../services/admin'
 import * as payrollService from '../services/payroll'
+import * as pedagogieService from '../services/pedagogie'
+import * as backupService from '../services/backup'
+import { getBackupSettings } from '../services/settings'
 import { handlePdfAction, handlePdfPrint } from '../services/pdf-handler'
 import { backupDatabase, restoreDatabase, getDbPath } from '../../../db/database'
 import { seedDemoData, seedReferenceData } from '../../../db/seed'
@@ -472,5 +475,136 @@ export function registerIpcHandlers(): void {
       throw new Error('Confirmation incorrecte')
     }
     return adminService.exitDemoMode(session.utilisateur.id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.ELEVE_DOCUMENTS_LIST, (_, eleveId) =>
+    elevesService.listDocumentsEleve(eleveId)
+  )
+  ipcMain.handle(IPC_CHANNELS.ELEVE_DOCUMENT_ADD, (_, eleveId, data, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return elevesService.addDocumentEleve(eleveId, data, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.ELEVE_DOCUMENT_DELETE, (_, id, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return elevesService.deleteDocumentEleve(id, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.ELEVE_PHOTO_SET, (_, eleveId, contenu, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return elevesService.setElevePhoto(eleveId, contenu, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.PASSAGE_CANDIDATS, (_, anneeSourceId, anneeCibleId) =>
+    elevesService.listCandidatsPassage(anneeSourceId, anneeCibleId)
+  )
+  ipcMain.handle(IPC_CHANNELS.PASSAGE_INSCRIRE, (_, anneeSourceId, anneeCibleId, lignes, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et au secrétariat')
+    }
+    return elevesService.inscrirePassage(
+      anneeSourceId,
+      anneeCibleId,
+      lignes,
+      session.utilisateur.id
+    )
+  })
+
+  ipcMain.handle(IPC_CHANNELS.CALENDRIER_LIST, (_, anneeId) =>
+    pedagogieService.listCalendrier(anneeId)
+  )
+  ipcMain.handle(IPC_CHANNELS.CALENDRIER_UPSERT, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et au secrétariat')
+    }
+    return pedagogieService.upsertCalendrier(data, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.CALENDRIER_DELETE, (_, id, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et au secrétariat')
+    }
+    return pedagogieService.deleteCalendrier(id, session.utilisateur.id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AFFECTATION_LIST, (_, anneeId) =>
+    pedagogieService.listAffectations(anneeId)
+  )
+  ipcMain.handle(IPC_CHANNELS.AFFECTATION_UPSERT, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et au secrétariat')
+    }
+    return pedagogieService.upsertAffectation(data, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.AFFECTATION_DELETE, (_, id, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et au secrétariat')
+    }
+    return pedagogieService.deleteAffectation(id, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.EMPLOI_LIST, (_, classeId) =>
+    pedagogieService.listEmploiDuTemps(classeId)
+  )
+  ipcMain.handle(IPC_CHANNELS.EMPLOI_UPSERT, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et au secrétariat')
+    }
+    return pedagogieService.upsertEmploiDuTemps(data, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.EMPLOI_DELETE, (_, id, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et au secrétariat')
+    }
+    return pedagogieService.deleteEmploiDuTemps(id, session.utilisateur.id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.ECHEANCIER_LIST, (_, anneeId, fraisId) =>
+    financesService.listEcheancier(anneeId, fraisId)
+  )
+  ipcMain.handle(IPC_CHANNELS.ECHEANCIER_UPSERT, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'comptable'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et à la comptabilité')
+    }
+    return financesService.upsertEcheance(data, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.ECHEANCIER_DELETE, (_, id, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'comptable'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et à la comptabilité')
+    }
+    return financesService.deleteEcheance(id, session.utilisateur.id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.BACKUP_SETTINGS_GET, (_, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return getBackupSettings()
+  })
+  ipcMain.handle(IPC_CHANNELS.BACKUP_SETTINGS_SET, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return backupService.updateBackupSettings(data)
+  })
+  ipcMain.handle(IPC_CHANNELS.BACKUP_CHOOSE_DIR, (_, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return backupService.chooseBackupDirectory()
+  })
+  ipcMain.handle(IPC_CHANNELS.BACKUP_RUN_AUTO, (_, force, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return backupService.runScheduledBackup(Boolean(force))
   })
 }

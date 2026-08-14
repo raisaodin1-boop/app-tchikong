@@ -3,6 +3,7 @@ import { join } from 'path'
 import { initDatabase, closeDatabase } from '../../db/database'
 import { seedReferenceData } from '../../db/seed'
 import { registerIpcHandlers } from './ipc/handlers'
+import { runScheduledBackup } from './services/backup'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -42,6 +43,7 @@ app.whenReady().then(() => {
   initDatabase()
   seedReferenceData()
   registerIpcHandlers()
+  runScheduledBackup()
   createWindow()
 
   app.on('activate', () => {
