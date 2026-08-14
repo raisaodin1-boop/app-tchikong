@@ -8,7 +8,7 @@ interface AppContextType {
   classes: Classe[]
   niveaux: Niveau[]
   refreshData: () => Promise<void>
-  setAnneeActiveId: (id: number) => Promise<void>
+  setAnneeActiveId: (id: number, token: string) => Promise<void>
   loading: boolean
 }
 
@@ -47,8 +47,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setAnneeActiveId = useCallback(
-    async (id: number) => {
-      await window.api.setActiveAnnee(id)
+    async (id: number, token: string) => {
+      await window.api.setActiveAnnee(id, token)
       await refreshData()
     },
     [refreshData]

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
 import { formatDateFr } from '../../lib/dates'
 import type { AnneeScolaire } from '@shared/types'
 
 export default function AnneesPage() {
+  const { token } = useAuth()
   const { annees, anneeActive, refreshData, setAnneeActiveId } = useApp()
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -18,6 +20,7 @@ export default function AnneesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!token) return
     if (form.date_fin <= form.date_debut) {
       setError('La date de fin doit être postérieure à la date de début')
       return
@@ -25,12 +28,15 @@ export default function AnneesPage() {
     setSaving(true)
     setError('')
     try {
-      await window.api.createAnnee({
-        libelle: form.libelle,
-        date_debut: form.date_debut,
-        date_fin: form.date_fin,
-        activer: form.activer
-      })
+      await window.api.createAnnee(
+        {
+          libelle: form.libelle,
+          date_debut: form.date_debut,
+          date_fin: form.date_fin,
+          activer: form.activer
+        },
+        token!
+      )
       setShowForm(false)
       setForm({ libelle: '', date_debut: '', date_fin: '', activer: false })
       await refreshData()
@@ -44,7 +50,8 @@ export default function AnneesPage() {
   const activer = async (a: AnneeScolaire) => {
     if (a.id === anneeActive?.id) return
     if (!confirm(`Activer l'année ${a.libelle} ? Les écrans afficheront cette année.`)) return
-    await setAnneeActiveId(a.id)
+    if (!token) return
+    await setAnneeActiveId(a.id, token)
   }
 
   return (

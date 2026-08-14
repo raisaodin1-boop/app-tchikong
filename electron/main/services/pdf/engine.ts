@@ -732,8 +732,9 @@ export class PdfBuilder {
     this.ensureSpace(96)
 
     if (dateLabel) {
-      this.page.drawText(dateLabel, {
-        x: A4.width / 2 - this.fontItalic.widthOfTextAtSize(sanitizeText(dateLabel), 9) / 2,
+      const safeDate = sanitizeText(dateLabel)
+      this.page.drawText(safeDate, {
+        x: A4.width / 2 - this.fontItalic.widthOfTextAtSize(safeDate, 9) / 2,
         y: this.y,
         size: 9,
         font: this.fontItalic,

@@ -142,6 +142,80 @@ export function getListeClasseData(classeId: number): {
   }
 }
 
+export interface AnnuaireClasseData {
+  classe_nom: string
+  section_code: string
+  annee_libelle: string
+  effectif: number
+  titulaire_nom: string | null
+  eleves: {
+    numero: number
+    matricule: string
+    nom: string
+    prenom: string
+    contacts: string
+  }[]
+}
+
+export function getAnnuaireClasseData(classeId: number): AnnuaireClasseData | null {
+  const db = getDb()
+  const classe = db
+    .prepare(
+      `SELECT c.nom as classe_nom, s.code as section_code, a.libelle as annee_libelle,
+        CASE WHEN t.id IS NOT NULL THEN t.prenom || ' ' || t.nom ELSE NULL END as titulaire_nom
+       FROM classes c
+       JOIN sections s ON s.id = c.section_id
+       JOIN annees_scolaires a ON a.id = c.annee_scolaire_id
+       LEFT JOIN enseignants t ON t.id = c.titulaire_id
+       WHERE c.id = ?`
+    )
+    .get(classeId) as
+    | { classe_nom: string; section_code: string; annee_libelle: string; titulaire_nom: string | null }
+    | undefined
+
+  if (!classe) return null
+
+  const eleves = db
+    .prepare(
+      `SELECT e.matricule, e.nom, e.prenom,
+        GROUP_CONCAT(
+          TRIM(pt.nom || ' ' || COALESCE(pt.prenom, '')) ||
+          CASE
+            WHEN pt.telephone IS NOT NULL AND pt.telephone != '' THEN ' — ' || pt.telephone
+            ELSE ''
+          END,
+          ' | '
+        ) as contacts
+       FROM inscriptions i
+       JOIN eleves e ON e.id = i.eleve_id
+       LEFT JOIN parents_tuteurs pt ON pt.eleve_id = e.id
+       WHERE i.classe_id = ? AND i.statut = 'actif'
+       GROUP BY e.id
+       ORDER BY e.nom, e.prenom`
+    )
+    .all(classeId) as {
+    matricule: string
+    nom: string
+    prenom: string
+    contacts: string | null
+  }[]
+
+  return {
+    classe_nom: classe.classe_nom,
+    section_code: classe.section_code,
+    annee_libelle: classe.annee_libelle,
+    effectif: eleves.length,
+    titulaire_nom: classe.titulaire_nom,
+    eleves: eleves.map((e, i) => ({
+      numero: i + 1,
+      matricule: e.matricule,
+      nom: e.nom,
+      prenom: e.prenom,
+      contacts: e.contacts || '—'
+    }))
+  }
+}
+
 export function enregistrerDocumentOfficiel(
   eleveId: number,
   type: TypeDocumentOfficiel,

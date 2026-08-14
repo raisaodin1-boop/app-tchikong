@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
 import type { Inscription, MotifAbsence, PresenceEleve } from '@shared/types'
 import { Save, Check, X } from 'lucide-react'
+import { todayIso } from '../../lib/dates'
 
 const motifOptions: { value: MotifAbsence; label: string }[] = [
   { value: 'maladie', label: 'Maladie' },
@@ -16,13 +17,14 @@ export default function PresencePage() {
   const { token } = useAuth()
   const { anneeActive, classes } = useApp()
   const [classeId, setClasseId] = useState<number>(0)
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(todayIso())
   const [eleves, setEleves] = useState<Inscription[]>([])
   const [presences, setPresences] = useState<
     Record<number, { present: boolean; motif?: MotifAbsence; notes?: string }>
   >({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (classes.length > 0 && !classeId) {
@@ -84,21 +86,27 @@ export default function PresencePage() {
   const handleSave = async () => {
     if (!token || !classeId) return
     setSaving(true)
-    await window.api.savePresences(
-      {
-        classe_id: classeId,
-        date,
-        presences: eleves.map((e) => ({
-          eleve_id: e.eleve_id,
-          present: presences[e.eleve_id]?.present ?? true,
-          motif_absence: presences[e.eleve_id]?.motif,
-          notes: presences[e.eleve_id]?.notes
-        }))
-      },
-      token
-    )
-    setSaving(false)
-    setSaved(true)
+    setError('')
+    try {
+      await window.api.savePresences(
+        {
+          classe_id: classeId,
+          date,
+          presences: eleves.map((e) => ({
+            eleve_id: e.eleve_id,
+            present: presences[e.eleve_id]?.present ?? true,
+            motif_absence: presences[e.eleve_id]?.motif,
+            notes: presences[e.eleve_id]?.notes
+          }))
+        },
+        token
+      )
+      setSaved(true)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'L’enregistrement a échoué')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const absents = eleves.filter((e) => !presences[e.eleve_id]?.present).length
@@ -113,6 +121,7 @@ export default function PresencePage() {
             {presents} présent{presents !== 1 ? 's' : ''} · {absents} absent
             {absents !== 1 ? 's' : ''}
           </p>
+          {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
         </div>
         <div className="flex gap-2">
           <button className="btn-secondary btn-sm" onClick={markAllPresent}>

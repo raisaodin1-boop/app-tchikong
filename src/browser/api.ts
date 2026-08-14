@@ -57,6 +57,15 @@ function requireFinanceAccess(token: string): void {
   }
 }
 
+function requirePaymentAccess(token: string): void {
+  const session = authService.getSession(token)
+  if (!session || !['directrice', 'comptable', 'secretariat'].includes(session.utilisateur.role)) {
+    throw new Error(
+      'Accès aux paiements réservé à la direction, à la comptabilité et au secrétariat.'
+    )
+  }
+}
+
 function requireAcademicAccess(token: string): void {
   const session = authService.getSession(token)
   if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
@@ -258,9 +267,14 @@ const browserApi = {
   listNiveaux: async (sectionId?: number) => referentielService.listNiveaux(sectionId),
   listAnnees: async () => referentielService.listAnnees(),
   getActiveAnnee: async () => referentielService.getActiveAnnee(),
-  createAnnee: async (data: Parameters<typeof referentielService.createAnnee>[0]) =>
-    mutate(() => referentielService.createAnnee(data)),
-  setActiveAnnee: async (id: number) => mutate(() => referentielService.setActiveAnnee(id)),
+  createAnnee: async (data: Parameters<typeof referentielService.createAnnee>[0], token: string) => {
+    requireDirector(token)
+    return mutate(() => referentielService.createAnnee(data))
+  },
+  setActiveAnnee: async (id: number, token: string) => {
+    requireDirector(token)
+    return mutate(() => referentielService.setActiveAnnee(id))
+  },
   startNewAnnee: async (
     data: import('../../shared/types').NouvelleAnneeFormData,
     token: string
@@ -380,6 +394,34 @@ const browserApi = {
     }
     return handlePdf({ type: 'bulletin', data }, action, data.eleve.matricule)
   },
+  exportBulletinsClassePdf: async (
+    classeId: number,
+    periodeId: number,
+    action: 'save' | 'print' = 'save'
+  ) => {
+    const { items, skipped } = scolariteService.collectBulletinsClassePdfData(classeId, periodeId)
+    if (items.length === 0) {
+      return {
+        success: false,
+        error:
+          skipped > 0
+            ? 'Les notes ont changé. Régénérez les bulletins avant impression.'
+            : 'Aucun bulletin à imprimer. Générez d’abord les bulletins.'
+      }
+    }
+    const result = await handlePdf(
+      { type: 'bulletins_classe', data: { items } },
+      action,
+      items[0]?.classe.nom || 'classe'
+    )
+    if (result.success && skipped > 0) {
+      return {
+        ...result,
+        error: `${skipped} bulletin(s) ignoré(s) (notes à jour non régénérées).`
+      }
+    }
+    return result
+  },
   exportPalmaresPdf: async (
     classeId: number,
     periodeId: number,
@@ -404,7 +446,11 @@ const browserApi = {
     )
   },
   genererDocument: async (
-    type: 'attestation_scolarite' | 'certificat_frequentation' | 'attestation_reussite',
+    type:
+      | 'attestation_scolarite'
+      | 'certificat_frequentation'
+      | 'attestation_reussite'
+      | 'certificat_radiation',
     eleveId: number,
     anneeId: number | undefined,
     action: 'save' | 'print',
@@ -417,7 +463,7 @@ const browserApi = {
       await mutate(() =>
         documentsService.enregistrerDocumentOfficiel(
           eleveId,
-          type,
+          type === 'certificat_radiation' ? 'autre' : type,
           `${type}-${eleveId}-${Date.now()}`,
           JSON.stringify(data),
           userId(token)
@@ -430,6 +476,11 @@ const browserApi = {
     const data = documentsService.getListeClasseData(classeId)
     if (!data) return { success: false, error: 'Classe introuvable' }
     return handlePdf({ type: 'liste_classe', data }, action, data.classe_nom)
+  },
+  exportAnnuaireClassePdf: async (classeId: number, action: 'save' | 'print' = 'save') => {
+    const data = documentsService.getAnnuaireClasseData(classeId)
+    if (!data) return { success: false, error: 'Classe introuvable' }
+    return handlePdf({ type: 'annuaire_classe', data }, action, data.classe_nom)
   },
 
   getFinancesDashboard: async (anneeId: number) =>
@@ -449,8 +500,14 @@ const browserApi = {
     requireDirector(token)
     return mutate(() => financesService.deleteFraisConfiguration(id, userId(token)))
   },
-  createPaiement: async (data: PaiementFormData, token: string) =>
-    mutate(() => financesService.createPaiement(data, userId(token))),
+  createPaiement: async (data: PaiementFormData, token: string) => {
+    requirePaymentAccess(token)
+    return mutate(() => financesService.createPaiement(data, userId(token)))
+  },
+  annulerPaiement: async (id: number, token: string) => {
+    requirePaymentAccess(token)
+    return mutate(() => financesService.annulerPaiement(id, userId(token)))
+  },
   listPaiements: async (filters?: PaiementFiltres) => financesService.listPaiements(filters),
   listImpayes: async (anneeId: number, classeId?: number) =>
     financesService.listImpayes(anneeId, classeId),

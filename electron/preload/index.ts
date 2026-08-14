@@ -48,16 +48,19 @@ const api = {
   listAnnees: (): Promise<AnneeScolaire[]> => ipcRenderer.invoke(IPC_CHANNELS.ANNEE_LIST),
   getActiveAnnee: (): Promise<AnneeScolaire | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.ANNEE_GET_ACTIVE),
-  createAnnee: (data: {
-    libelle: string
-    date_debut: string
-    date_fin: string
-    nb_sequences?: number
-    nb_trimestres?: number
-    activer?: boolean
-  }): Promise<AnneeScolaire> => ipcRenderer.invoke(IPC_CHANNELS.ANNEE_CREATE, data),
-  setActiveAnnee: (id: number): Promise<AnneeScolaire> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ANNEE_SET_ACTIVE, id),
+  createAnnee: (
+    data: {
+      libelle: string
+      date_debut: string
+      date_fin: string
+      nb_sequences?: number
+      nb_trimestres?: number
+      activer?: boolean
+    },
+    token: string
+  ): Promise<AnneeScolaire> => ipcRenderer.invoke(IPC_CHANNELS.ANNEE_CREATE, data, token),
+  setActiveAnnee: (id: number, token: string): Promise<AnneeScolaire> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ANNEE_SET_ACTIVE, id, token),
   startNewAnnee: (
     data: import('../../shared/types').NouvelleAnneeFormData,
     token: string
@@ -153,6 +156,12 @@ const api = {
     action?: 'save' | 'print'
   ): Promise<{ success: boolean; path?: string; error?: string; printed?: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.BULLETIN_PDF, eleveId, periodeId, action ?? 'save'),
+  exportBulletinsClassePdf: (
+    classeId: number,
+    periodeId: number,
+    action?: 'save' | 'print'
+  ): Promise<{ success: boolean; path?: string; error?: string; printed?: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BULLETINS_CLASSE_PDF, classeId, periodeId, action ?? 'save'),
   exportPalmaresPdf: (
     classeId: number,
     periodeId: number,
@@ -171,7 +180,11 @@ const api = {
 
   // Documents officiels
   genererDocument: (
-    type: 'attestation_scolarite' | 'certificat_frequentation' | 'attestation_reussite',
+    type:
+      | 'attestation_scolarite'
+      | 'certificat_frequentation'
+      | 'attestation_reussite'
+      | 'certificat_radiation',
     eleveId: number,
     anneeId: number | undefined,
     action: 'save' | 'print',
@@ -183,6 +196,11 @@ const api = {
     action?: 'save' | 'print'
   ): Promise<{ success: boolean; path?: string; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.LISTE_CLASSE_PDF, classeId, action ?? 'save'),
+  exportAnnuaireClassePdf: (
+    classeId: number,
+    action?: 'save' | 'print'
+  ): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ANNUAIRE_CLASSE_PDF, classeId, action ?? 'save'),
 
   // Finances
   getFinancesDashboard: (anneeId: number): Promise<import('../../shared/types').FinancesDashboard> =>
@@ -200,6 +218,8 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE_DELETE, id, token),
   createPaiement: (data: import('../../shared/types').PaiementFormData, token: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, data, token),
+  annulerPaiement: (id: number, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_ANNULER, id, token),
   listPaiements: (filtres?: import('../../shared/types').PaiementFiltres) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_LIST, filtres),
   listImpayes: (anneeId: number, classeId?: number) =>

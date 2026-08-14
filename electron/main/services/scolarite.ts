@@ -413,3 +413,28 @@ export function listBulletinsClasse(classeId: number, periodeId: number): (Bulle
     )
     .all(classeId, periodeId) as (Bulletin & { nom: string; prenom: string; matricule: string })[]
 }
+
+export function collectBulletinsClassePdfData(
+  classeId: number,
+  periodeId: number
+): { items: BulletinData[]; skipped: number } {
+  const bulletins = listBulletinsClasse(classeId, periodeId)
+  const items: BulletinData[] = []
+  let skipped = 0
+  for (const bulletin of bulletins) {
+    const data = getBulletinData(bulletin.eleve_id, periodeId)
+    if (!data?.bulletin) {
+      skipped += 1
+      continue
+    }
+    if (
+      Math.abs(data.bulletin.moyenne_generale - data.moyenne.moyenne) > 0.001 ||
+      data.bulletin.rang !== data.moyenne.rang
+    ) {
+      skipped += 1
+      continue
+    }
+    items.push(data)
+  }
+  return { items, skipped }
+}

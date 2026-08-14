@@ -149,10 +149,11 @@ export default function EleveFormPage() {
         const eleve = await window.api.createEleve(data, token)
         navigate(`/eleves/${eleve.id}`)
       }
-    } catch {
-      setError('Erreur lors de l\'enregistrement')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Erreur lors de l'enregistrement")
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const updateParent = (index: number, field: string, value: unknown) => {

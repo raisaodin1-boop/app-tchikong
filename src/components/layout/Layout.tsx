@@ -92,11 +92,27 @@ export default function Layout() {
           <span className="text-tchikong-200">Année scolaire</span>
           {annees.length > 1 ? (
             <select
-              className="mt-1 w-full rounded bg-tchikong-800/80 border border-tchikong-500 px-2 py-1 text-xs font-semibold text-white"
+              className="mt-1 w-full rounded bg-tchikong-800/80 border border-tchikong-500 px-2 py-1 text-xs font-semibold text-white disabled:opacity-70"
               value={anneeActive?.id ?? ''}
+              disabled={user?.role !== 'directrice'}
+              title={
+                user?.role === 'directrice'
+                  ? 'Changer l’année active pour tout le monde'
+                  : 'Seul la direction peut changer l’année scolaire active'
+              }
               onChange={(e) => {
                 const id = Number(e.target.value)
-                if (id) void setAnneeActiveId(id)
+                if (!id || id === anneeActive?.id || !token) return
+                const year = annees.find((a) => a.id === id)
+                if (
+                  !confirm(
+                    `Activer l’année ${year?.libelle ?? id} pour tout l’établissement ? Les autres utilisateurs verront cette année.`
+                  )
+                ) {
+                  e.target.value = String(anneeActive?.id ?? '')
+                  return
+                }
+                void setAnneeActiveId(id, token)
               }}
             >
               {annees.map((a) => (

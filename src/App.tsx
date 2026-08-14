@@ -49,6 +49,14 @@ function RoleRoute({ access, children }: { access: NavKey; children: React.React
   return <>{children}</>
 }
 
+function FinanceFullRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  if (!['directrice', 'comptable'].includes(user?.role || '')) {
+    return <Navigate to="/finances" replace />
+  }
+  return <>{children}</>
+}
+
 function DirectriceRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   if (loading) return <LoadingScreen />
@@ -142,8 +150,22 @@ export default function App() {
           <Route path="paiement" element={<PaiementPage />} />
           <Route path="historique" element={<HistoriquePage />} />
           <Route path="impayes" element={<ImpayesPage />} />
-          <Route path="depenses" element={<DepensesPage />} />
-          <Route path="bilan" element={<BilanAnnuelPage />} />
+          <Route
+            path="depenses"
+            element={
+              <FinanceFullRoute>
+                <DepensesPage />
+              </FinanceFullRoute>
+            }
+          />
+          <Route
+            path="bilan"
+            element={
+              <FinanceFullRoute>
+                <BilanAnnuelPage />
+              </FinanceFullRoute>
+            }
+          />
           <Route path="echeancier" element={<EcheancierPage />} />
         </Route>
         <Route

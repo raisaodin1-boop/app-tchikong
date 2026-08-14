@@ -9,7 +9,7 @@ const tabs = [
   { to: '/finances/impayes', icon: AlertCircle, label: 'Impayés' },
   { to: '/finances/depenses', icon: Receipt, label: 'Dépenses', financeOnly: true },
   { to: '/finances/bilan', icon: BarChart3, label: 'Bilan annuel', financeOnly: true },
-  { to: '/finances/echeancier', icon: CalendarClock, label: 'Échéancier', financeOnly: true }
+  { to: '/finances/echeancier', icon: CalendarClock, label: 'Échéancier' }
 ]
 
 export default function FinancesPage() {

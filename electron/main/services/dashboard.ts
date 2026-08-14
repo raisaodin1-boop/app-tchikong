@@ -50,7 +50,7 @@ export function getDashboardStats(anneeScolaireId?: number): DashboardStats {
     ? (db
         .prepare(
           `SELECT COALESCE(SUM(montant), 0) as total FROM paiements
-           WHERE annee_scolaire_id = ? AND date_paiement >= ?`
+           WHERE annee_scolaire_id = ? AND date_paiement >= ? AND IFNULL(annule, 0) = 0`
         )
         .get(anneeId, monthStart) as { total: number }).total
     : 0
@@ -58,7 +58,8 @@ export function getDashboardStats(anneeScolaireId?: number): DashboardStats {
   const recettesAnnee = anneeId
     ? (db
         .prepare(
-          `SELECT COALESCE(SUM(montant), 0) as total FROM paiements WHERE annee_scolaire_id = ?`
+          `SELECT COALESCE(SUM(montant), 0) as total FROM paiements
+           WHERE annee_scolaire_id = ? AND IFNULL(annule, 0) = 0`
         )
         .get(anneeId) as { total: number }).total
     : 0

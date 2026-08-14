@@ -1,5 +1,5 @@
 import { PdfBuilder } from '../engine'
-import { generateDocumentNumber } from '../utils'
+import { generateDocumentNumber, formatDateShort, todayFormatted } from '../utils'
 
 export interface ListeClasseData {
   classe_nom: string
@@ -47,7 +47,7 @@ export async function templateListeClasse(data: ListeClasseData): Promise<Uint8A
         e.nom,
         e.prenom,
         e.sexe === 'F' ? 'F' : 'M',
-        new Date(e.date_naissance).toLocaleDateString('fr-FR')
+        formatDateShort(e.date_naissance)
       ]
     })),
     17
@@ -58,7 +58,7 @@ export async function templateListeClasse(data: ListeClasseData): Promise<Uint8A
       { title: 'Le Maître de classe', subtitle: data.titulaire_nom || 'Signature' },
       { title: 'La Directrice', subtitle: 'Cachet et signature' }
     ],
-    `Fait à Douala, le ${new Date().toLocaleDateString('fr-FR')}`
+    `Fait à Douala, le ${todayFormatted()}`
   )
 
   return builder.build()

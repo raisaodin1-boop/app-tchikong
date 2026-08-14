@@ -63,7 +63,11 @@ export default function EleveDetailPage() {
   const [statutSaving, setStatutSaving] = useState(false)
 
   const genererDocument = async (
-    type: 'attestation_scolarite' | 'certificat_frequentation' | 'attestation_reussite',
+    type:
+      | 'attestation_scolarite'
+      | 'certificat_frequentation'
+      | 'attestation_reussite'
+      | 'certificat_radiation',
     action: 'save' | 'print'
   ) => {
     if (!id || !token) return
@@ -405,7 +409,8 @@ export default function EleveDetailPage() {
                 [
                   { type: 'attestation_scolarite' as const, label: 'Attestation de scolarité' },
                   { type: 'certificat_frequentation' as const, label: 'Certificat de fréquentation' },
-                  { type: 'attestation_reussite' as const, label: 'Attestation de réussite' }
+                  { type: 'attestation_reussite' as const, label: 'Attestation de réussite' },
+                  { type: 'certificat_radiation' as const, label: 'Certificat de radiation' }
                 ] as const
               ).map((doc) => (
                 <div key={doc.type} className="flex gap-1">

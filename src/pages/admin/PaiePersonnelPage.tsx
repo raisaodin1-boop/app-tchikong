@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Banknote, CheckCircle, RefreshCw, Save, WalletCards } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
+import { todayIso } from '../../lib/dates'
 import type {
   ModePaiement,
   PaieMensuelle,
@@ -22,8 +23,8 @@ export default function PaiePersonnelPage() {
   const { user, token } = useAuth()
   const { anneeActive } = useApp()
   const initialMonth = useMemo(() => {
-    if (!anneeActive) return new Date().toISOString().slice(0, 7)
-    const current = new Date().toISOString().slice(0, 7)
+    if (!anneeActive) return todayIso().slice(0, 7)
+    const current = todayIso().slice(0, 7)
     const start = anneeActive.date_debut.slice(0, 7)
     const end = anneeActive.date_fin.slice(0, 7)
     return current >= start && current <= end ? current : start
@@ -35,7 +36,7 @@ export default function PaiePersonnelPage() {
   const [salaryDrafts, setSalaryDrafts] = useState<Record<number, string>>({})
   const [paying, setPaying] = useState<PaieMensuelleRow | null>(null)
   const [payment, setPayment] = useState({
-    date_paiement: new Date().toISOString().slice(0, 10),
+    date_paiement: todayIso(),
     mode_paiement: 'virement' as ModePaiement,
     reference: '',
     notes: ''

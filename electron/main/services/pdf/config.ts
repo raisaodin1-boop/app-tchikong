@@ -64,7 +64,10 @@ export type DocumentType =
   | 'attestation_scolarite'
   | 'certificat_frequentation'
   | 'attestation_reussite'
+  | 'certificat_radiation'
   | 'liste_classe'
+  | 'annuaire_classe'
+  | 'bulletins_classe'
   | 'recu_paiement'
   | 'liste_impayes'
 
@@ -74,7 +77,10 @@ export const DOCUMENT_TITLES: Record<DocumentType, string> = {
   attestation_scolarite: 'ATTESTATION DE SCOLARITÉ',
   certificat_frequentation: 'CERTIFICAT DE FRÉQUENTATION',
   attestation_reussite: 'ATTESTATION DE RÉUSSITE',
+  certificat_radiation: 'CERTIFICAT DE RADIATION',
   liste_classe: 'LISTE DE CLASSE',
+  annuaire_classe: 'ANNUAIRE DES PARENTS',
+  bulletins_classe: 'BULLETINS DE CLASSE',
   recu_paiement: 'REÇU DE PAIEMENT',
   liste_impayes: 'LISTE DES IMPAYÉS'
 }

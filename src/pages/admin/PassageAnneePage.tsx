@@ -19,7 +19,7 @@ type RowState = {
 
 export default function PassageAnneePage() {
   const { token } = useAuth()
-  const { anneeActive, annees, classes } = useApp()
+  const { anneeActive, annees, classes, niveaux } = useApp()
   const [sourceId, setSourceId] = useState(0)
   const [candidats, setCandidats] = useState<CandidatPassage[]>([])
   const [rows, setRows] = useState<Record<number, RowState>>({})
@@ -97,9 +97,18 @@ export default function PassageAnneePage() {
     setError('')
     try {
       const result = await window.api.inscrirePassage(sourceId, anneeActive.id, lignes, token)
+      const errText = result.erreurs.length
+        ? '\n' +
+          result.erreurs
+            .map((err: { eleve_id: number; message: string }) => {
+              const candidat = candidats.find((c) => c.eleve_id === err.eleve_id)
+              return `• ${candidat?.matricule ?? err.eleve_id} : ${err.message}`
+            })
+            .join('\n')
+        : ''
       alert(
         `Terminé : ${result.inscrits} admissions, ${result.redoublants} redoublements, ${result.transferes} transferts, ${result.diplomes} diplômés.` +
-          (result.erreurs.length ? `\n${result.erreurs.length} erreur(s).` : '')
+          errText
       )
       await load()
     } catch (reason) {
@@ -170,11 +179,16 @@ export default function PassageAnneePage() {
               candidats.map((c) => {
                 const state = rows[c.eleve_id]
                 const needsClass = state?.decision === 'admission' || state?.decision === 'redoublement'
-                const targetClasses = classes.filter((cl) =>
-                  state?.decision === 'redoublement'
-                    ? cl.niveau_id === c.niveau_id && cl.section_id === c.section_id
-                    : cl.section_id === c.section_id
-                )
+                const targetClasses = classes.filter((cl) => {
+                  if (state?.decision === 'redoublement') {
+                    return cl.niveau_id === c.niveau_id && cl.section_id === c.section_id
+                  }
+                  if (state?.decision === 'admission') {
+                    const dest = niveaux.find((n) => n.id === cl.niveau_id)
+                    return cl.section_id === c.section_id && dest?.ordre === c.niveau_ordre + 1
+                  }
+                  return false
+                })
                 return (
                   <tr key={c.eleve_id} className={c.deja_inscrit ? 'opacity-50' : ''}>
                     <td>
@@ -206,13 +220,35 @@ export default function PassageAnneePage() {
                         disabled={c.deja_inscrit}
                         value={state?.decision ?? c.decision_suggeree}
                         onChange={(e) =>
-                          setRows((current) => ({
-                            ...current,
-                            [c.eleve_id]: {
-                              ...current[c.eleve_id],
-                              decision: e.target.value as DecisionPassage
+                          setRows((current) => {
+                            const decision = e.target.value as DecisionPassage
+                            const nextClasses =
+                              decision === 'redoublement'
+                                ? classes.filter(
+                                    (cl) =>
+                                      cl.niveau_id === c.niveau_id && cl.section_id === c.section_id
+                                  )
+                                : decision === 'admission'
+                                  ? classes.filter((cl) => {
+                                      const dest = niveaux.find((n) => n.id === cl.niveau_id)
+                                      return (
+                                        cl.section_id === c.section_id &&
+                                        dest?.ordre === c.niveau_ordre + 1
+                                      )
+                                    })
+                                  : []
+                            return {
+                              ...current,
+                              [c.eleve_id]: {
+                                ...current[c.eleve_id],
+                                decision,
+                                classe_id:
+                                  decision === 'admission'
+                                    ? c.classe_cible_id ?? nextClasses[0]?.id ?? 0
+                                    : nextClasses[0]?.id ?? 0
+                              }
                             }
-                          }))
+                          })
                         }
                       >
                         {DECISIONS.map((d) => (

@@ -1,6 +1,6 @@
 import type { AttestationData } from '../../documents'
 import { PdfBuilder } from '../engine'
-import { formatDate, generateDocumentNumber, sexeLabel, sexeNe } from '../utils'
+import { formatDate, generateDocumentNumber, sexeLabel, sexeNe, todayFormatted } from '../utils'
 
 export async function templateAttestationScolarite(data: AttestationData): Promise<Uint8Array> {
   const docNum = generateDocumentNumber('attestation_scolarite')
@@ -23,7 +23,7 @@ export async function templateAttestationScolarite(data: AttestationData): Promi
 
   builder.drawSignatureBlocks(
     [{ title: 'La Directrice', subtitle: 'Cachet et signature' }],
-    `Fait à Douala, le ${formatDate(new Date().toISOString())}`
+    `Fait à Douala, le ${todayFormatted()}`
   )
 
   return builder.build()
@@ -54,7 +54,7 @@ export async function templateCertificatFrequentation(data: AttestationData): Pr
 
   builder.drawSignatureBlocks(
     [{ title: 'La Directrice', subtitle: 'Cachet et signature' }],
-    `Fait à Douala, le ${formatDate(new Date().toISOString())}`
+    `Fait à Douala, le ${todayFormatted()}`
   )
 
   return builder.build()
@@ -81,7 +81,37 @@ export async function templateAttestationReussite(data: AttestationData): Promis
 
   builder.drawSignatureBlocks(
     [{ title: 'La Directrice', subtitle: 'Cachet et signature' }],
-    `Fait à Douala, le ${formatDate(new Date().toISOString())}`
+    `Fait à Douala, le ${todayFormatted()}`
+  )
+
+  return builder.build()
+}
+
+export async function templateCertificatRadiation(data: AttestationData): Promise<Uint8Array> {
+  const docNum = generateDocumentNumber('certificat_radiation')
+
+  const builder = await PdfBuilder.create()
+  builder.setMeta('Certificat de radiation / transfert', docNum)
+
+  builder.drawOfficialHeader()
+  builder.drawDocumentTitle(
+    'CERTIFICAT DE RADIATION',
+    `Transfert scolaire  •  ${data.annee_libelle}`
+  )
+
+  builder.drawAttestationBody([
+    `Je soussignée, Directrice du Groupe Scolaire Bilingue Primaire et Maternelle TCHIKONG, certifie que :`,
+    ``,
+    `    ${sexeNe(data.eleve.sexe)} ${data.eleve.prenom} ${data.eleve.nom.toUpperCase()}, matricule ${data.eleve.matricule}, de sexe ${sexeLabel(data.eleve.sexe).toLowerCase()}, ${sexeNe(data.eleve.sexe).toLowerCase()} le ${formatDate(data.eleve.date_naissance)},`,
+    ``,
+    `était régulièrement inscrit(e) dans notre établissement en classe de ${data.classe.nom} (section ${data.classe.section_nom}, niveau ${data.classe.niveau_nom}) pour l'année scolaire ${data.annee_libelle}.`,
+    ``,
+    `L'élève est radié(e) des effectifs à compter de ce jour. Le présent certificat de radiation / transfert est délivré pour permettre son inscription dans un autre établissement et pour servir et valoir ce que de droit.`
+  ])
+
+  builder.drawSignatureBlocks(
+    [{ title: 'La Directrice', subtitle: 'Cachet et signature' }],
+    `Fait à Douala, le ${todayFormatted()}`
   )
 
   return builder.build()

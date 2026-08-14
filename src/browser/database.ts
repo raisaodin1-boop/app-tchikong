@@ -7,6 +7,7 @@ import payrollMigrationSql from '../../db/migrations/004_payroll.sql?raw'
 import sessionsMigrationSql from '../../db/migrations/005_sessions.sql?raw'
 import pedagogieMigrationSql from '../../db/migrations/006_annee_pedagogie.sql?raw'
 import titulaireMigrationSql from '../../db/migrations/007_titulaire_classe.sql?raw'
+import paiementsAnnulesMigrationSql from '../../db/migrations/008_paiements_annules.sql?raw'
 
 const STORAGE_DB = 'tchikong-offline-storage'
 const STORAGE_VERSION = 1
@@ -164,7 +165,8 @@ function runBrowserMigrations(db: Database): void {
     { version: 4, name: 'payroll', sql: payrollMigrationSql },
     { version: 5, name: 'sessions_persistantes', sql: sessionsMigrationSql },
     { version: 6, name: 'annee_pedagogie', sql: pedagogieMigrationSql },
-    { version: 7, name: 'titulaire_classe', sql: titulaireMigrationSql }
+    { version: 7, name: 'titulaire_classe', sql: titulaireMigrationSql },
+    { version: 8, name: 'paiements_annules', sql: paiementsAnnulesMigrationSql }
   ]
 
   for (const migration of migrations) {

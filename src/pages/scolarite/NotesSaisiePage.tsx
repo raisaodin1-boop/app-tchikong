@@ -43,7 +43,9 @@ export default function NotesSaisiePage() {
 
   useEffect(() => {
     if (!classeId || !periodeId) return
+    let cancelled = false
     window.api.getNotesGrid(classeId, periodeId).then((g: NotesGrid | null) => {
+      if (cancelled) return
       setGrid(g)
       if (g && matiereId) {
         const initial: Record<number, { valeur: string; appreciation: string }> = {}
@@ -58,6 +60,9 @@ export default function NotesSaisiePage() {
         setSaved(false)
       }
     })
+    return () => {
+      cancelled = true
+    }
   }, [classeId, periodeId, matiereId])
 
   const handleSave = async () => {

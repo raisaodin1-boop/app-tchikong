@@ -15,7 +15,17 @@ export async function templateRecuPaiement(data: RecuData): Promise<Uint8Array> 
   builder.setMeta('Reçu de paiement', docNum)
 
   builder.drawOfficialHeader()
-  builder.drawDocumentTitle('REÇU DE PAIEMENT', `Pièce justificative  •  N° ${docNum}`)
+  builder.drawDocumentTitle(
+    data.paiement.annule ? 'REÇU ANNULÉ' : 'REÇU DE PAIEMENT',
+    `Pièce justificative  •  N° ${docNum}`
+  )
+
+  if (data.paiement.annule) {
+    builder.drawParagraph(
+      '',
+      'Ce reçu a été annulé. Le montant n’est plus comptabilisé dans la situation financière de l’élève.'
+    )
+  }
 
   builder.drawHeroAmount('MONTANT REÇU', formatMoney(data.paiement.montant))
 

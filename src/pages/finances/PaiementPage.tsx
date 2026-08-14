@@ -3,6 +3,7 @@ import { Search, Save, Printer, CheckCircle } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
+import { todayIso } from '../../lib/dates'
 import type { Inscription, ModePaiement, SituationFinanciere, Paiement } from '@shared/types'
 
 const MODE_OPTIONS: { value: ModePaiement; label: string }[] = [
@@ -28,7 +29,7 @@ export default function PaiementPage() {
     frais_modele_id: 0,
     montant: '',
     mode_paiement: 'especes' as ModePaiement,
-    date_paiement: new Date().toISOString().slice(0, 10),
+    date_paiement: todayIso(),
     notes: ''
   })
   const [saving, setSaving] = useState(false)
@@ -108,11 +109,24 @@ export default function PaiementPage() {
     e.preventDefault()
     if (!token || !anneeActive || !eleveSelectionne) return
     const montant = Number(form.montant)
-    if (!montant || montant <= 0) return
+    if (!montant || montant <= 0) {
+      setError('Indiquez un montant supérieur à 0')
+      return
+    }
     const selectedFee = situation?.details.find(
       (detail) => detail.frais_modele_id === form.frais_modele_id
     )
-    if (!selectedFee) return
+    if (!selectedFee) {
+      setError('Sélectionnez un module de frais')
+      return
+    }
+    if (
+      !confirm(
+        `Enregistrer ${formatMoney(montant)} pour ${eleveSelectionne.prenom} ${eleveSelectionne.nom} (${selectedFee.libelle}) ?`
+      )
+    ) {
+      return
+    }
 
     setSaving(true)
     setError('')

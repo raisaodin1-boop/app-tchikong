@@ -1,6 +1,25 @@
+export function todayIso(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function parseLocalDate(dateStr: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!match) {
+    const parsed = new Date(dateStr)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+}
+
 export function formatDate(dateStr: string, locale = 'fr-FR'): string {
   try {
-    return new Date(dateStr).toLocaleDateString(locale, {
+    const date = parseLocalDate(dateStr)
+    if (!date) return dateStr
+    return date.toLocaleDateString(locale, {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
@@ -12,14 +31,16 @@ export function formatDate(dateStr: string, locale = 'fr-FR'): string {
 
 export function formatDateShort(dateStr: string): string {
   try {
-    return new Date(dateStr).toLocaleDateString('fr-FR')
+    const date = parseLocalDate(dateStr)
+    if (!date) return dateStr
+    return date.toLocaleDateString('fr-FR')
   } catch {
     return dateStr
   }
 }
 
 export function todayFormatted(): string {
-  return formatDate(new Date().toISOString())
+  return formatDate(todayIso())
 }
 
 export function generateDocumentNumber(type: string): string {
@@ -31,7 +52,10 @@ export function generateDocumentNumber(type: string): string {
     attestation_scolarite: 'ATS',
     certificat_frequentation: 'CTF',
     attestation_reussite: 'ATR',
-    liste_classe: 'LST'
+    certificat_radiation: 'RAD',
+    liste_classe: 'LST',
+    annuaire_classe: 'ANN',
+    bulletins_classe: 'BUL'
   }
   return `${prefix[type] || 'DOC'}-${year}-${seq}`
 }

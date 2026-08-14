@@ -11,6 +11,9 @@ import type {
   TypeDepense,
   TypeFrais
 } from '../../../shared/types'
+import { todayIso } from './pdf/utils'
+
+const PAIEMENT_ACTIF = 'IFNULL(annule, 0) = 0'
 
 // --- Types internes ---
 
@@ -317,7 +320,7 @@ export function getSituationFinanciere(
   const paiements = db
     .prepare(
       `SELECT frais_modele_id, type_frais, COALESCE(SUM(montant), 0) as total
-       FROM paiements WHERE eleve_id = ? AND annee_scolaire_id = ?
+       FROM paiements WHERE eleve_id = ? AND annee_scolaire_id = ? AND ${PAIEMENT_ACTIF}
        GROUP BY frais_modele_id, type_frais`
     )
     .all(eleveId, anneeScolaireId) as {
@@ -417,7 +420,7 @@ export function createPaiement(data: PaiementFormData, userId?: number): Paiemen
       data.montant,
       data.mode_paiement,
       numeroRecu,
-      data.date_paiement || new Date().toISOString().slice(0, 10),
+      data.date_paiement || todayIso(),
       data.notes ?? null,
       userId ?? null
     )
@@ -427,6 +430,23 @@ export function createPaiement(data: PaiementFormData, userId?: number): Paiemen
   return db
     .prepare('SELECT * FROM paiements WHERE id = ?')
     .get(result.lastInsertRowid) as Paiement
+}
+
+export function annulerPaiement(id: number, userId?: number): Paiement {
+  const db = getDb()
+  const paiement = db.prepare('SELECT * FROM paiements WHERE id = ?').get(id) as Paiement | undefined
+  if (!paiement) throw new Error('Paiement introuvable')
+  if (paiement.annule) throw new Error('Ce paiement est déjà annulé')
+
+  db.prepare(
+    `UPDATE paiements
+     SET annule = 1, annule_le = datetime('now'), annule_par = ?
+     WHERE id = ?`
+  ).run(userId ?? null, id)
+
+  logActivity(userId ?? null, 'annulation', 'paiement', id, paiement.numero_recu)
+
+  return db.prepare('SELECT * FROM paiements WHERE id = ?').get(id) as Paiement
 }
 
 export function listPaiements(filtres: PaiementFiltres = {}): (Paiement & {
@@ -614,7 +634,7 @@ export function getFinancesDashboard(anneeScolaireId: number): FinancesDashboard
     db
       .prepare(
         `SELECT COALESCE(SUM(montant), 0) as t FROM paiements
-         WHERE annee_scolaire_id = ? AND date_paiement >= ?`
+         WHERE annee_scolaire_id = ? AND date_paiement >= ? AND ${PAIEMENT_ACTIF}`
       )
       .get(anneeScolaireId, monthStart) as { t: number }
   ).t
@@ -622,7 +642,8 @@ export function getFinancesDashboard(anneeScolaireId: number): FinancesDashboard
   const recettes_annee = (
     db
       .prepare(
-        `SELECT COALESCE(SUM(montant), 0) as t FROM paiements WHERE annee_scolaire_id = ?`
+        `SELECT COALESCE(SUM(montant), 0) as t FROM paiements
+         WHERE annee_scolaire_id = ? AND ${PAIEMENT_ACTIF}`
       )
       .get(anneeScolaireId) as { t: number }
   ).t
@@ -668,7 +689,9 @@ export function getFinancesDashboard(anneeScolaireId: number): FinancesDashboard
   const taux_recouvrement =
     totalAttendu > 0 ? Math.round((recettes_annee / totalAttendu) * 10000) / 100 : 0
 
-  const paiements_recents = listPaiements({ annee_scolaire_id: anneeScolaireId }).slice(0, 8)
+  const paiements_recents = listPaiements({ annee_scolaire_id: anneeScolaireId })
+    .filter((paiement) => !paiement.annule)
+    .slice(0, 8)
 
   const recettes_par_section = db
     .prepare(
@@ -676,7 +699,7 @@ export function getFinancesDashboard(anneeScolaireId: number): FinancesDashboard
        FROM paiements p
        JOIN inscriptions i ON i.eleve_id = p.eleve_id AND i.annee_scolaire_id = p.annee_scolaire_id
        JOIN sections s ON s.id = i.section_id
-       WHERE p.annee_scolaire_id = ?
+       WHERE p.annee_scolaire_id = ? AND ${PAIEMENT_ACTIF.replace('annule', 'p.annule')}
        GROUP BY s.id`
     )
     .all(anneeScolaireId) as { section: string; montant: number }[]
@@ -723,7 +746,7 @@ export function createDepense(
       data.type,
       data.libelle,
       data.montant,
-      data.date_depense || new Date().toISOString().slice(0, 10),
+      data.date_depense || todayIso(),
       data.beneficiaire ?? null,
       data.notes ?? null,
       userId ?? null
@@ -784,7 +807,7 @@ export function getBilanAnnuel(anneeScolaireId: number): BilanAnnuel {
            FROM paiements p
            JOIN inscriptions i ON i.eleve_id = p.eleve_id
              AND i.annee_scolaire_id = p.annee_scolaire_id
-           WHERE p.annee_scolaire_id = ? AND i.classe_id = ?`
+           WHERE p.annee_scolaire_id = ? AND i.classe_id = ? AND IFNULL(p.annule, 0) = 0`
         )
         .get(anneeScolaireId, classe.id) as { total: number }
     ).total
@@ -910,7 +933,7 @@ function buildEcheances(
   const echeances = forModule.length > 0 ? forModule : rows.filter((row) => row.frais_modele_id == null)
   if (echeances.length === 0) return []
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIso()
   let remainingPaid = montantPaye
   return echeances.map((row) => {
     const due = Math.round((montantDu * row.pourcentage) / 100)

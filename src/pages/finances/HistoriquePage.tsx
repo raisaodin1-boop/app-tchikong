@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Search, Printer, FileDown } from 'lucide-react'
+import { Search, Printer, FileDown, Ban } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
 import { formatDateFr } from '../../lib/dates'
 import type { Paiement, TypeFrais } from '@shared/types'
@@ -19,6 +20,7 @@ const TYPE_LABELS: Record<TypeFrais, string> = {
 }
 
 export default function HistoriquePage() {
+  const { token } = useAuth()
   const { anneeActive } = useApp()
   const [paiements, setPaiements] = useState<(Paiement & { nom: string; prenom: string; matricule: string; classe_nom: string })[]>([])
   const [recherche, setRecherche] = useState('')
@@ -53,7 +55,24 @@ export default function HistoriquePage() {
     }
   }
 
-  const total = paiements.reduce((s, p) => s + p.montant, 0)
+  const handleAnnuler = async (p: (typeof paiements)[number]) => {
+    if (!token || p.annule) return
+    if (
+      !confirm(
+        `Annuler le paiement ${p.numero_recu} de ${formatMoney(p.montant)} pour ${p.prenom} ${p.nom} ? Cette action est irréversible.`
+      )
+    ) {
+      return
+    }
+    try {
+      await window.api.annulerPaiement(p.id, token)
+      await load()
+    } catch (reason) {
+      alert(reason instanceof Error ? reason.message : "Impossible d'annuler le paiement")
+    }
+  }
+
+  const total = paiements.filter((p) => !p.annule).reduce((s, p) => s + p.montant, 0)
 
   return (
     <div>
@@ -83,7 +102,7 @@ export default function HistoriquePage() {
               <th>Type</th>
               <th>Mode</th>
               <th className="text-right">Montant</th>
-              <th className="w-24">Reçu</th>
+              <th className="w-36">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -93,14 +112,17 @@ export default function HistoriquePage() {
               <tr><td colSpan={8} className="text-center py-8 text-gray-400">Aucun paiement trouvé</td></tr>
             ) : (
               paiements.map((p) => (
-                <tr key={p.id}>
+                <tr key={p.id} className={p.annule ? 'opacity-60' : ''}>
                   <td>{formatDateFr(p.date_paiement)}</td>
                   <td className="font-mono text-xs">{p.numero_recu}</td>
                   <td className="font-medium">{p.nom} {p.prenom}</td>
                   <td>{p.classe_nom}</td>
                   <td><span className="badge-blue">{TYPE_LABELS[p.type_frais]}</span></td>
                   <td className="text-xs capitalize">{p.mode_paiement.replace('_', ' ')}</td>
-                  <td className="text-right font-semibold text-accent-green">{formatMoney(p.montant)}</td>
+                  <td className="text-right font-semibold text-accent-green">
+                    {formatMoney(p.montant)}
+                    {p.annule ? <span className="ml-2 badge-red">Annulé</span> : null}
+                  </td>
                   <td>
                     <div className="flex gap-1">
                       <button className="btn-secondary btn-sm px-2" onClick={() => handleRecu(p.id, 'print')} title="Imprimer">
@@ -109,6 +131,15 @@ export default function HistoriquePage() {
                       <button className="btn-secondary btn-sm px-2" onClick={() => handleRecu(p.id, 'save')} title="PDF">
                         <FileDown className="h-3.5 w-3.5" />
                       </button>
+                      {!p.annule && (
+                        <button
+                          className="btn-secondary btn-sm px-2 text-red-600"
+                          onClick={() => void handleAnnuler(p)}
+                          title="Annuler le paiement"
+                        >
+                          <Ban className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

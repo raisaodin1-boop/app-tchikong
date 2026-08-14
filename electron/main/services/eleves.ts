@@ -330,6 +330,7 @@ export function savePresences(data: PresenceJourData, userId?: number): void {
     `INSERT INTO presences_eleves (eleve_id, classe_id, date, present, motif_absence, notes)
      VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(eleve_id, date) DO UPDATE SET
+       classe_id = excluded.classe_id,
        present = excluded.present,
        motif_absence = excluded.motif_absence,
        notes = excluded.notes`
@@ -589,6 +590,7 @@ export function listCandidatsPassage(
       classe_source_nom: row.classe_source_nom,
       niveau_id: row.niveau_id,
       niveau_nom: row.niveau_nom,
+      niveau_ordre: row.niveau_ordre,
       section_id: row.section_id,
       section_code: row.section_code,
       decision_suggeree: decision,
@@ -618,10 +620,11 @@ export function inscrirePassage(
       try {
         const source = db
           .prepare(
-            `SELECT i.*, n.ordre as niveau_ordre, c.nom as classe_nom
+            `SELECT i.*, n.ordre as niveau_ordre, c.nom as classe_nom, e.matricule
              FROM inscriptions i
              JOIN niveaux n ON n.id = i.niveau_id
              JOIN classes c ON c.id = i.classe_id
+             JOIN eleves e ON e.id = i.eleve_id
              WHERE i.eleve_id = ? AND i.annee_scolaire_id = ?`
           )
           .get(ligne.eleve_id, anneeSourceId) as
@@ -632,6 +635,7 @@ export function inscrirePassage(
               niveau_id: number
               niveau_ordre: number
               classe_nom: string
+              matricule: string
             }
           | undefined
         if (!source) throw new Error("Inscription d'origine introuvable")
@@ -681,6 +685,20 @@ export function inscrirePassage(
         }
         if (!classeId) throw new Error('Aucune classe cible disponible')
         const classe = validateEnrollmentClass(anneeCibleId, classeId)
+        const destOrdre = (
+          db.prepare('SELECT ordre FROM niveaux WHERE id = ?').get(classe.niveau_id) as
+            | { ordre: number }
+            | undefined
+        )?.ordre
+        if (destOrdre == null) throw new Error('Niveau de la classe cible introuvable')
+        if (ligne.decision === 'admission' && destOrdre <= source.niveau_ordre) {
+          throw new Error(
+            `${source.matricule}: un élève admis doit aller dans un niveau supérieur`
+          )
+        }
+        if (ligne.decision === 'redoublement' && destOrdre !== source.niveau_ordre) {
+          throw new Error(`${source.matricule}: un redoublement doit rester au même niveau`)
+        }
         db.prepare(
           `INSERT INTO inscriptions
             (eleve_id, annee_scolaire_id, classe_id, section_id, niveau_id, redoublement, statut)

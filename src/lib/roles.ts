@@ -4,7 +4,7 @@ export type NavKey = 'dashboard' | 'eleves' | 'presence' | 'scolarite' | 'financ
 
 const ACCESS: Record<RoleUtilisateur, NavKey[]> = {
   directrice: ['dashboard', 'eleves', 'presence', 'scolarite', 'finances', 'admin'],
-  secretariat: ['dashboard', 'eleves', 'presence', 'scolarite', 'admin'],
+  secretariat: ['dashboard', 'eleves', 'presence', 'scolarite', 'finances', 'admin'],
   comptable: ['dashboard', 'eleves', 'finances']
 }
 

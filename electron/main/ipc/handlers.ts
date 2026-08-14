@@ -16,6 +16,33 @@ import { handlePdfAction, handlePdfPrint } from '../services/pdf-handler'
 import { backupDatabase, restoreDatabase, getDbPath } from '../../../db/database'
 import { seedDemoData, seedReferenceData } from '../../../db/seed'
 import { dialog } from 'electron'
+import { todayIso } from '../services/pdf/utils'
+import type { AuthSession } from '../../../shared/types'
+
+function requireSession(token?: string): AuthSession {
+  if (!token) throw new Error('Session expirée. Veuillez vous reconnecter.')
+  const session = authService.getSession(token)
+  if (!session) throw new Error('Session expirée. Veuillez vous reconnecter.')
+  return session
+}
+
+function requireDirector(token?: string): AuthSession {
+  const session = requireSession(token)
+  if (session.utilisateur.role !== 'directrice') {
+    throw new Error('Accès réservé à la directrice')
+  }
+  return session
+}
+
+function requirePaymentAccess(token?: string): AuthSession {
+  const session = requireSession(token)
+  if (!['directrice', 'comptable', 'secretariat'].includes(session.utilisateur.role)) {
+    throw new Error(
+      'Accès aux paiements réservé à la direction, à la comptabilité et au secrétariat.'
+    )
+  }
+  return session
+}
 
 export function registerIpcHandlers(): void {
   // Auth
@@ -31,7 +58,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.DB_BACKUP, async () => {
     const result = await dialog.showSaveDialog({
       title: 'Sauvegarder la base de données',
-      defaultPath: `tchikong-backup-${new Date().toISOString().slice(0, 10)}.db`,
+      defaultPath: `tchikong-backup-${todayIso()}.db`,
       filters: [{ name: 'SQLite', extensions: ['db'] }]
     })
     if (!result.canceled && result.filePath) {
@@ -65,8 +92,14 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle(IPC_CHANNELS.ANNEE_LIST, () => referentielService.listAnnees())
   ipcMain.handle(IPC_CHANNELS.ANNEE_GET_ACTIVE, () => referentielService.getActiveAnnee())
-  ipcMain.handle(IPC_CHANNELS.ANNEE_CREATE, (_, data) => referentielService.createAnnee(data))
-  ipcMain.handle(IPC_CHANNELS.ANNEE_SET_ACTIVE, (_, id) => referentielService.setActiveAnnee(id))
+  ipcMain.handle(IPC_CHANNELS.ANNEE_CREATE, (_, data, token) => {
+    requireDirector(token)
+    return referentielService.createAnnee(data)
+  })
+  ipcMain.handle(IPC_CHANNELS.ANNEE_SET_ACTIVE, (_, id, token) => {
+    requireDirector(token)
+    return referentielService.setActiveAnnee(id)
+  })
   ipcMain.handle(IPC_CHANNELS.ANNEE_START, (_, data, token) => {
     const session = authService.getSession(token)
     if (!session || session.utilisateur.role !== 'directrice') {
@@ -247,7 +280,8 @@ export function registerIpcHandlers(): void {
       const validTypes = [
         'attestation_scolarite',
         'certificat_frequentation',
-        'attestation_reussite'
+        'attestation_reussite',
+        'certificat_radiation'
       ] as const
 
       if (!validTypes.includes(type)) {
@@ -265,7 +299,7 @@ export function registerIpcHandlers(): void {
       if (result.success && result.path) {
         documentsService.enregistrerDocumentOfficiel(
           eleveId,
-          type,
+          type === 'certificat_radiation' ? 'autre' : type,
           result.path,
           JSON.stringify(data),
           userId ?? undefined
@@ -287,6 +321,48 @@ export function registerIpcHandlers(): void {
       'Liste de classe'
     )
   })
+
+  ipcMain.handle(IPC_CHANNELS.ANNUAIRE_CLASSE_PDF, async (_, classeId, action = 'save') => {
+    const data = documentsService.getAnnuaireClasseData(classeId)
+    if (!data) return { success: false, error: 'Classe introuvable' }
+
+    return handlePdfAction(
+      { type: 'annuaire_classe', data },
+      action as 'save' | 'print',
+      data.classe_nom,
+      'Annuaire des parents'
+    )
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.BULLETINS_CLASSE_PDF,
+    async (_, classeId, periodeId, action = 'save') => {
+      const { items, skipped } = scolariteService.collectBulletinsClassePdfData(classeId, periodeId)
+      if (items.length === 0) {
+        return {
+          success: false,
+          error:
+            skipped > 0
+              ? 'Les notes ont changé. Régénérez les bulletins avant impression.'
+              : 'Aucun bulletin à imprimer. Générez d’abord les bulletins.'
+        }
+      }
+      const classeNom = items[0]?.classe.nom || 'classe'
+      const result = await handlePdfAction(
+        { type: 'bulletins_classe', data: { items } },
+        action as 'save' | 'print',
+        classeNom,
+        'Bulletins de classe'
+      )
+      if (result.success && skipped > 0) {
+        return {
+          ...result,
+          error: `${skipped} bulletin(s) ignoré(s) (notes à jour non régénérées).`
+        }
+      }
+      return result
+    }
+  )
 
   // Impression rapide (sans dialogue sauf print dialog système)
   ipcMain.handle(IPC_CHANNELS.PDF_PRINT, async (_, payload) => {
@@ -318,8 +394,12 @@ export function registerIpcHandlers(): void {
     return financesService.deleteFraisConfiguration(id, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, (_, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return financesService.createPaiement(data, userId ?? undefined)
+    const session = requirePaymentAccess(token)
+    return financesService.createPaiement(data, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_ANNULER, (_, id, token) => {
+    const session = requirePaymentAccess(token)
+    return financesService.annulerPaiement(id, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_LIST, (_, filtres) =>
     financesService.listPaiements(filtres)

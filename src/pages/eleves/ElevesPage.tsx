@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, Filter, Printer, FileDown } from 'lucide-react'
+import { Plus, Search, Filter, Printer, FileDown, BookUser } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import type { Inscription, StatutEleve } from '@shared/types'
 
@@ -50,6 +50,26 @@ export default function ElevesPage() {
       }
     } catch (reason) {
       alert(reason instanceof Error ? reason.message : 'Impossible de générer la liste de classe')
+    } finally {
+      setListPrinting(false)
+    }
+  }
+
+  const handlePrintAnnuaire = async (action: 'save' | 'print') => {
+    if (!filtreClasse) {
+      alert('Choisissez d’abord la classe dont vous voulez l’annuaire')
+      return
+    }
+    setListPrinting(true)
+    try {
+      const result = await window.api.exportAnnuaireClassePdf(filtreClasse, action)
+      if (result.success && action === 'save' && result.path) {
+        alert(`Annuaire enregistré : ${result.path}`)
+      } else if (!result.success) {
+        alert(result.error || 'Impossible de générer l’annuaire des parents')
+      }
+    } catch (reason) {
+      alert(reason instanceof Error ? reason.message : 'Impossible de générer l’annuaire des parents')
     } finally {
       setListPrinting(false)
     }
@@ -140,6 +160,26 @@ export default function ElevesPage() {
             >
               <FileDown className="h-4 w-4" />
               Enregistrer le PDF
+            </button>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => void handlePrintAnnuaire('print')}
+              disabled={listPrinting || !filtreClasse}
+              title="Imprimer l’annuaire des parents"
+            >
+              <BookUser className="h-4 w-4" />
+              Annuaire parents
+            </button>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              onClick={() => void handlePrintAnnuaire('save')}
+              disabled={listPrinting || !filtreClasse}
+              title="Enregistrer l’annuaire des parents"
+            >
+              <FileDown className="h-4 w-4" />
+              Annuaire PDF
             </button>
           </div>
         </div>

@@ -1,0 +1,3 @@
+ALTER TABLE paiements ADD COLUMN annule INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE paiements ADD COLUMN annule_le TEXT;
+ALTER TABLE paiements ADD COLUMN annule_par INTEGER;

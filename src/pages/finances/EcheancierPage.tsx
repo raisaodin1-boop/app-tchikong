@@ -6,8 +6,9 @@ import { formatDateFr } from '../../lib/dates'
 import type { EcheancierPaiement, FraisConfiguration } from '@shared/types'
 
 export default function EcheancierPage() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const { anneeActive } = useApp()
+  const canEdit = user?.role === 'directrice' || user?.role === 'comptable'
   const [modules, setModules] = useState<FraisConfiguration[]>([])
   const [fraisId, setFraisId] = useState(0)
   const [tranches, setTranches] = useState<EcheancierPaiement[]>([])
@@ -94,6 +95,7 @@ export default function EcheancierPage() {
         </select>
       </div>
 
+      {canEdit && (
       <form onSubmit={submit} className="card p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
         <div className="md:col-span-2">
           <label className="label">Libellé</label>
@@ -132,6 +134,7 @@ export default function EcheancierPage() {
           Ajouter la tranche
         </button>
       </form>
+      )}
 
       <div className="table-container">
         <table className="data-table">
@@ -157,9 +160,11 @@ export default function EcheancierPage() {
                   <td>{formatDateFr(t.date_limite)}</td>
                   <td className="text-right">{t.pourcentage} %</td>
                   <td>
+                    {canEdit && (
                     <button className="btn-icon text-red-500" onClick={() => remove(t.id)}>
                       <Trash2 className="h-4 w-4" />
                     </button>
+                    )}
                   </td>
                 </tr>
               ))

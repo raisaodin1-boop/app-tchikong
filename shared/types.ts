@@ -343,6 +343,7 @@ export interface CandidatPassage {
   niveau_nom: string
   section_id: number
   section_code: SectionCode
+  niveau_ordre: number
   decision_suggeree: DecisionPassage
   classe_cible_id: number | null
   classe_cible_nom: string | null
@@ -403,6 +404,9 @@ export interface Paiement {
   notes: string | null
   created_by: number | null
   frais_modele_id: number | null
+  annule?: number
+  annule_le?: string | null
+  annule_par?: number | null
 }
 
 export interface Depense {
@@ -933,11 +937,13 @@ export const IPC_CHANNELS = {
   BULLETIN_DATA: 'scolarite:bulletinData',
   BULLETIN_LIST: 'scolarite:bulletinList',
   BULLETIN_PDF: 'scolarite:bulletinPdf',
+  BULLETINS_CLASSE_PDF: 'scolarite:bulletinsClassePdf',
   PALMARES_PDF: 'scolarite:palmaresPdf',
 
   // Documents PDF
   DOCUMENT_GENERER: 'document:generer',
   LISTE_CLASSE_PDF: 'document:listeClasse',
+  ANNUAIRE_CLASSE_PDF: 'document:annuaireClasse',
   PDF_PRINT: 'pdf:print',
 
   // Finances
@@ -947,6 +953,7 @@ export const IPC_CHANNELS = {
   FINANCES_GRILLE_UPSERT: 'finances:grilleUpsert',
   FINANCES_GRILLE_DELETE: 'finances:grilleDelete',
   FINANCES_PAIEMENT_CREATE: 'finances:paiementCreate',
+  FINANCES_PAIEMENT_ANNULER: 'finances:paiementAnnuler',
   FINANCES_PAIEMENT_LIST: 'finances:paiementList',
   FINANCES_IMPAYES: 'finances:impayes',
   FINANCES_RECU_PDF: 'finances:recuPdf',

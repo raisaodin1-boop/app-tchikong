@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
-import { formatDateFr } from '../../lib/dates'
+import { formatDateFr, todayIso } from '../../lib/dates'
 import { formatMoney } from '../../lib/money'
 import type { Depense, TypeDepense } from '@shared/types'
 
@@ -22,7 +22,7 @@ export default function DepensesPage() {
     type: 'fourniture' as TypeDepense,
     libelle: '',
     montant: '',
-    date_depense: new Date().toISOString().slice(0, 10),
+    date_depense: todayIso(),
     beneficiaire: '',
     notes: ''
   })
@@ -39,22 +39,27 @@ export default function DepensesPage() {
     e.preventDefault()
     if (!token || !anneeActive) return
     setSaving(true)
-    await window.api.createDepense(
-      {
-        annee_scolaire_id: anneeActive.id,
-        type: form.type,
-        libelle: form.libelle,
-        montant: Number(form.montant),
-        date_depense: form.date_depense,
-        beneficiaire: form.beneficiaire || undefined,
-        notes: form.notes || undefined
-      },
-      token
-    )
-    setForm({ type: 'fourniture', libelle: '', montant: '', date_depense: new Date().toISOString().slice(0, 10), beneficiaire: '', notes: '' })
-    setShowForm(false)
-    await load()
-    setSaving(false)
+    try {
+      await window.api.createDepense(
+        {
+          annee_scolaire_id: anneeActive.id,
+          type: form.type,
+          libelle: form.libelle,
+          montant: Number(form.montant),
+          date_depense: form.date_depense,
+          beneficiaire: form.beneficiaire || undefined,
+          notes: form.notes || undefined
+        },
+        token
+      )
+      setForm({ type: 'fourniture', libelle: '', montant: '', date_depense: todayIso(), beneficiaire: '', notes: '' })
+      setShowForm(false)
+      await load()
+    } catch (reason) {
+      alert(reason instanceof Error ? reason.message : 'L’enregistrement a échoué')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const total = depenses.reduce((s, d) => s + d.montant, 0)

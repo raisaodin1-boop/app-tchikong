@@ -40,7 +40,7 @@ export default function BulletinsPage() {
   const [rows, setRows] = useState<BulletinRow[]>([])
   const [appreciations, setAppreciations] = useState<Record<number, string>>({})
   const [generating, setGenerating] = useState(false)
-  const [exporting, setExporting] = useState<number | null>(null)
+  const [exporting, setExporting] = useState<number | 'all' | null>(null)
 
   useEffect(() => {
     if (classes.length > 0 && !classeId) setClasseId(classes[0].id)
@@ -103,6 +103,29 @@ export default function BulletinsPage() {
       alert(error instanceof Error ? error.message : 'La génération des bulletins a échoué')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleExportClasse = async (action: 'save' | 'print') => {
+    if (!classeId || !periodeId) return
+    if (
+      !confirm(
+        `${action === 'print' ? 'Imprimer' : 'Enregistrer'} les ${rows.length} bulletin(s) de la classe ?`
+      )
+    ) {
+      return
+    }
+    setExporting('all')
+    try {
+      const result = await window.api.exportBulletinsClassePdf(classeId, periodeId, action)
+      if (result.success) {
+        if (action === 'save' && result.path) alert(`Bulletins enregistrés : ${result.path}`)
+        if (result.error) alert(result.error)
+      } else if (result.error) {
+        alert(result.error)
+      }
+    } finally {
+      setExporting(null)
     }
   }
 
@@ -175,11 +198,31 @@ export default function BulletinsPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <button className="btn-primary btn-sm" onClick={handleGenerer} disabled={generating}>
           <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
           {generating ? 'Génération...' : 'Calculer moyennes et générer bulletins'}
         </button>
+        {rows.length > 0 && (
+          <>
+            <button
+              className="btn-secondary btn-sm"
+              onClick={() => void handleExportClasse('print')}
+              disabled={exporting !== null}
+            >
+              <Printer className="h-4 w-4" />
+              Imprimer tous les bulletins
+            </button>
+            <button
+              className="btn-secondary btn-sm"
+              onClick={() => void handleExportClasse('save')}
+              disabled={exporting !== null}
+            >
+              <FileDown className="h-4 w-4" />
+              Enregistrer tous les PDF
+            </button>
+          </>
+        )}
       </div>
 
       {rows.length > 0 && (
@@ -250,7 +293,7 @@ export default function BulletinsPage() {
                       <button
                         className="btn-secondary btn-sm"
                         onClick={() => handleExportPdf(row.eleve_id, 'print')}
-                        disabled={exporting === row.eleve_id}
+                        disabled={exporting === row.eleve_id || exporting === 'all'}
                         title="Imprimer"
                       >
                         <Printer className="h-3.5 w-3.5" />
@@ -258,7 +301,7 @@ export default function BulletinsPage() {
                       <button
                         className="btn-secondary btn-sm"
                         onClick={() => handleExportPdf(row.eleve_id, 'save')}
-                        disabled={exporting === row.eleve_id}
+                        disabled={exporting === row.eleve_id || exporting === 'all'}
                         title="Enregistrer PDF"
                       >
                         <FileDown className="h-3.5 w-3.5" />
