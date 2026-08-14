@@ -15,13 +15,14 @@ export async function templateRecuPaiement(data: RecuData): Promise<Uint8Array> 
   builder.setMeta('Reçu de paiement', docNum)
 
   builder.drawOfficialHeader()
-  builder.drawDocumentTitle('REÇU DE PAIEMENT', `N° ${docNum}`)
+  builder.drawDocumentTitle('REÇU DE PAIEMENT', `Pièce justificative  •  N° ${docNum}`)
 
-  // Bloc montant en évidence
+  builder.drawHeroAmount('MONTANT REÇU', formatMoney(data.paiement.montant))
+
   builder.drawResultRow([
-    { label: 'MONTANT REÇU', value: formatMoney(data.paiement.montant), color: COLORS.success },
     { label: 'MODE DE PAIEMENT', value: MODE_PAIEMENT_LABELS[data.paiement.mode_paiement] },
-    { label: 'DATE', value: formatDate(data.paiement.date_paiement) }
+    { label: 'DATE', value: formatDate(data.paiement.date_paiement) },
+    { label: 'N° REÇU', value: docNum }
   ])
 
   builder.drawInfoGrid([

@@ -3,6 +3,7 @@ import {
   PDFPage,
   PDFFont,
   StandardFonts,
+  degrees,
   type RGB
 } from 'pdf-lib'
 import QRCode from 'qrcode'
@@ -21,10 +22,13 @@ export interface TableRow {
   highlight?: boolean
 }
 
+const FRAME = 16
+
 export class PdfBuilder {
   private doc: PDFDocument
   private font!: PDFFont
   private fontBold!: PDFFont
+  private fontItalic!: PDFFont
   private page!: PDFPage
   private y = 0
   private pageNum = 0
@@ -46,6 +50,7 @@ export class PdfBuilder {
     const builder = new PdfBuilder(doc)
     builder.font = await doc.embedFont(StandardFonts.Helvetica)
     builder.fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
+    builder.fontItalic = await doc.embedFont(StandardFonts.TimesRomanItalic)
     builder.addPage()
     return builder
   }
@@ -61,7 +66,8 @@ export class PdfBuilder {
     this.page = this.doc.addPage([A4.width, A4.height])
     this.pageNum++
     this.y = A4.height - MARGINS.top
-    this.drawPageBorder()
+    this.drawPageFrame()
+    this.drawWatermark()
     return this
   }
 
@@ -89,23 +95,103 @@ export class PdfBuilder {
     return this
   }
 
-  private drawPageBorder(): void {
-    const inset = 20
+  private drawPageFrame(): void {
     this.page.drawRectangle({
-      x: inset,
-      y: inset,
-      width: A4.width - inset * 2,
-      height: A4.height - inset * 2,
+      x: FRAME,
+      y: FRAME,
+      width: A4.width - FRAME * 2,
+      height: A4.height - FRAME * 2,
       borderColor: COLORS.primary,
-      borderWidth: 1.5
+      borderWidth: 2.2
     })
     this.page.drawRectangle({
-      x: inset + 3,
-      y: inset + 3,
-      width: A4.width - inset * 2 - 6,
-      height: A4.height - inset * 2 - 6,
+      x: FRAME + 4,
+      y: FRAME + 4,
+      width: A4.width - FRAME * 2 - 8,
+      height: A4.height - FRAME * 2 - 8,
       borderColor: COLORS.accent,
-      borderWidth: 0.5
+      borderWidth: 0.9
+    })
+
+    const innerLeft = FRAME + 5
+    const innerWidth = A4.width - (FRAME + 5) * 2
+    this.page.drawRectangle({
+      x: innerLeft,
+      y: A4.height - FRAME - 14,
+      width: innerWidth,
+      height: 10,
+      color: COLORS.primary
+    })
+    this.page.drawRectangle({
+      x: innerLeft,
+      y: A4.height - FRAME - 17,
+      width: innerWidth,
+      height: 3,
+      color: COLORS.accent
+    })
+    this.page.drawRectangle({
+      x: innerLeft,
+      y: FRAME + 5,
+      width: innerWidth,
+      height: 16,
+      color: COLORS.primary
+    })
+    this.page.drawRectangle({
+      x: innerLeft,
+      y: FRAME + 21,
+      width: innerWidth,
+      height: 2.5,
+      color: COLORS.accent
+    })
+  }
+
+  private drawWatermark(): void {
+    const mark = 'TCHIKONG'
+    const size = 52
+    const tw = this.fontBold.widthOfTextAtSize(mark, size)
+    this.page.drawText(mark, {
+      x: (A4.width - tw) / 2,
+      y: A4.height / 2 - 10,
+      size,
+      font: this.fontBold,
+      color: COLORS.watermark,
+      rotate: degrees(28)
+    })
+  }
+
+  private drawCrest(cx: number, cy: number, r: number): void {
+    this.page.drawEllipse({
+      x: cx,
+      y: cy,
+      xScale: r,
+      yScale: r,
+      color: COLORS.primary
+    })
+    this.page.drawEllipse({
+      x: cx,
+      y: cy,
+      xScale: r - 3.2,
+      yScale: r - 3.2,
+      borderColor: COLORS.accent,
+      borderWidth: 1.8
+    })
+    this.drawCentered('T', cx, cy - 6, r > 16 ? 16 : 13, true, COLORS.accent)
+  }
+
+  private drawGoldRule(width = this.contentWidth, x = MARGINS.left): void {
+    this.page.drawRectangle({
+      x,
+      y: this.y,
+      width,
+      height: 1.4,
+      color: COLORS.accent
+    })
+    this.page.drawRectangle({
+      x,
+      y: this.y - 2.2,
+      width,
+      height: 0.5,
+      color: COLORS.primary
     })
   }
 
@@ -113,51 +199,72 @@ export class PdfBuilder {
   drawOfficialHeader(): this {
     const cx = A4.width / 2
 
-    // Bandeau supérieur
+    this.drawText('RÉPUBLIQUE DU CAMEROUN', MARGINS.left, this.y, 8, true, COLORS.primary)
+    const en = 'REPUBLIC OF CAMEROON'
+    this.drawText(en, A4.width - MARGINS.right - this.textWidth(en, 8, true), this.y, 8, true, COLORS.primary)
+    this.moveY(11)
+    this.page.drawText('Paix - Travail - Patrie', {
+      x: MARGINS.left,
+      y: this.y,
+      size: 7.5,
+      font: this.fontItalic,
+      color: COLORS.accentDark
+    })
+    const pw = 'Peace - Work - Fatherland'
+    this.page.drawText(pw, {
+      x: A4.width - MARGINS.right - this.fontItalic.widthOfTextAtSize(pw, 7.5),
+      y: this.y,
+      size: 7.5,
+      font: this.fontItalic,
+      color: COLORS.accentDark
+    })
+    this.moveY(10)
+    this.drawGoldRule()
+    this.moveY(12)
+
+    this.drawCentered("MINISTÈRE DE L'ÉDUCATION DE BASE", cx, this.y, 8, true, COLORS.primary)
+    this.moveY(11)
+    this.drawCentered('DÉLÉGATION RÉGIONALE DU LITTORAL', cx, this.y, 7, false, COLORS.textMuted)
+    this.moveY(16)
+
+    const boxHeight = 62
+    const boxY = this.y - boxHeight + 4
     this.page.drawRectangle({
       x: MARGINS.left,
-      y: A4.height - MARGINS.top - 5,
+      y: boxY,
+      width: this.contentWidth,
+      height: boxHeight,
+      color: COLORS.cream,
+      borderColor: COLORS.primary,
+      borderWidth: 1
+    })
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: boxY,
+      width: 5,
+      height: boxHeight,
+      color: COLORS.accent
+    })
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: boxY,
       width: this.contentWidth,
       height: 3,
       color: COLORS.primary
     })
 
-    // République du Cameroun
-    this.drawCentered('RÉPUBLIQUE DU CAMEROUN', cx, this.y, 9, true, COLORS.text)
-    this.moveY(12)
-    this.drawCentered('Paix — Travail — Patrie', cx, this.y, 8, false, COLORS.textMuted)
-    this.moveY(12)
-    this.drawCentered('********', cx, this.y, 8, false, COLORS.accent)
-    this.moveY(18)
+    this.drawCrest(MARGINS.left + 36, boxY + boxHeight / 2, 18)
 
-    // Ministère
-    this.drawCentered('MINISTÈRE DE L’ÉDUCATION DE BASE', cx, this.y, 8, true)
-    this.moveY(11)
-    this.drawCentered('DÉLÉGATION RÉGIONALE DU LITTORAL', cx, this.y, 7)
-    this.moveY(16)
-
-    // École — bloc central (nom, adresse, téléphone)
-    const boxHeight = 66
-    const boxY = this.y - boxHeight + 2
-    this.page.drawRectangle({
-      x: MARGINS.left + 40,
-      y: boxY,
-      width: this.contentWidth - 80,
-      height: boxHeight,
-      color: COLORS.primaryLight,
-      borderColor: COLORS.primary,
-      borderWidth: 1
-    })
-
-    this.drawCentered(SCHOOL.name, cx, this.y - 12, 11, true, COLORS.primary)
-    this.drawCentered(SCHOOL.subtitle, cx, this.y - 26, 10, true, COLORS.primary)
-    this.drawCentered(SCHOOL.address, cx, this.y - 40, 8, false, COLORS.textMuted)
-    const contacts = [SCHOOL.phone, SCHOOL.email].filter(Boolean).join('  |  ')
+    const textX = MARGINS.left + 64
+    this.drawText(SCHOOL.name, textX, this.y - 12, 11, true, COLORS.primary)
+    this.drawText(SCHOOL.subtitle, textX, this.y - 26, 9, true, COLORS.primaryMid)
+    this.drawText(SCHOOL.address, textX, this.y - 40, 8, false, COLORS.textMuted)
+    const contacts = [SCHOOL.phone, SCHOOL.email].filter(Boolean).join('   ')
     if (contacts) {
-      this.drawCentered(contacts, cx, this.y - 52, 8, false, COLORS.textMuted)
+      this.drawText(contacts, textX, this.y - 52, 8, true, COLORS.primary)
     }
 
-    this.y = boxY - 16
+    this.y = boxY - 14
     return this
   }
 
@@ -165,59 +272,105 @@ export class PdfBuilder {
   drawCompactHeader(): this {
     this.page.drawRectangle({
       x: MARGINS.left,
-      y: A4.height - MARGINS.top - 2,
+      y: A4.height - MARGINS.top - 4,
       width: this.contentWidth,
-      height: 22,
-      color: COLORS.primaryLight
+      height: 24,
+      color: COLORS.primary
     })
-    this.drawText(`${SCHOOL.subtitle}`, MARGINS.left + 8, A4.height - MARGINS.top + 2, 8, true, COLORS.primary)
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: A4.height - MARGINS.top - 7,
+      width: this.contentWidth,
+      height: 3,
+      color: COLORS.accent
+    })
+    this.drawText(
+      SCHOOL.subtitle,
+      MARGINS.left + 10,
+      A4.height - MARGINS.top + 4,
+      8,
+      true,
+      COLORS.accent
+    )
     if (this.documentTitle) {
-      const tw = this.textWidth(this.documentTitle, 8)
-      this.drawText(this.documentTitle, A4.width - MARGINS.right - tw - 8, A4.height - MARGINS.top + 2, 8, false, COLORS.textMuted)
+      const tw = this.textWidth(this.documentTitle, 8, true)
+      this.drawText(
+        this.documentTitle,
+        A4.width - MARGINS.right - tw - 10,
+        A4.height - MARGINS.top + 4,
+        8,
+        true,
+        COLORS.white
+      )
     }
-    this.y = A4.height - MARGINS.top - 30
+    this.y = A4.height - MARGINS.top - 32
     return this
   }
 
   drawDocumentTitle(title: string, subtitle?: string): this {
-    this.ensureSpace(50)
-    const cx = A4.width / 2
-    const tw = this.textWidth(title, 14, true)
+    this.ensureSpace(52)
+    const bandH = 28
     this.page.drawRectangle({
-      x: cx - tw / 2 - 16,
-      y: this.y - 18,
-      width: tw + 32,
-      height: 26,
+      x: MARGINS.left,
+      y: this.y - 20,
+      width: this.contentWidth,
+      height: bandH,
       color: COLORS.primary
     })
-    this.drawCentered(title, cx, this.y - 4, 14, true, COLORS.white)
-    this.moveY(32)
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - 23,
+      width: this.contentWidth,
+      height: 3,
+      color: COLORS.accent
+    })
+    this.drawCentered(title, A4.width / 2, this.y - 6, 13, true, COLORS.white)
+    this.moveY(36)
 
     if (subtitle) {
-      this.drawCentered(subtitle, cx, this.y, 9, false, COLORS.textMuted)
-      this.moveY(16)
+      this.drawCentered(subtitle, A4.width / 2, this.y, 8.5, false, COLORS.textMuted)
+      this.moveY(14)
     }
-
-    this.drawHorizontalLine()
-    this.moveY(12)
     return this
   }
 
   drawInfoGrid(rows: { label: string; value: string }[], columns = 2): this {
-    this.ensureSpace(rows.length * 16 + 10)
-    const colWidth = this.contentWidth / columns
+    const rowH = 22
+    const lines = Math.ceil(rows.length / columns)
+    const pad = 8
+    const boxH = lines * rowH + pad * 2
+    this.ensureSpace(boxH + 8)
 
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - boxH + 12,
+      width: this.contentWidth,
+      height: boxH,
+      color: COLORS.primaryLight,
+      borderColor: COLORS.border,
+      borderWidth: 0.6
+    })
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - boxH + 12 + boxH - 3,
+      width: this.contentWidth,
+      height: 3,
+      color: COLORS.accent
+    })
+
+    const colWidth = this.contentWidth / columns
+    this.moveY(pad)
     for (let i = 0; i < rows.length; i += columns) {
       for (let c = 0; c < columns; c++) {
         const row = rows[i + c]
         if (!row) continue
-        const x = MARGINS.left + c * colWidth
-        this.drawText(`${row.label} :`, x, this.y, 8, false, COLORS.textMuted)
-        this.drawText(row.value, x + 80, this.y, 9, true)
+        const x = MARGINS.left + c * colWidth + 10
+        this.drawText(`${row.label}`, x, this.y, 7, false, COLORS.textMuted)
+        this.drawText(row.value, x + 78, this.y, 9, true, COLORS.primaryDeep)
       }
-      this.moveY(16)
+      this.moveY(rowH)
     }
-    this.moveY(6)
+    this.moveY(10)
     return this
   }
 
@@ -225,9 +378,8 @@ export class PdfBuilder {
     const tableWidth = columns.reduce((s, c) => s + c.width, 0)
     const startX = MARGINS.left + (this.contentWidth - tableWidth) / 2
 
-    this.ensureSpace(rowHeight + 4)
+    this.ensureSpace(rowHeight + 6)
 
-    // En-tête tableau
     let x = startX
     const headerY = this.y
     this.page.drawRectangle({
@@ -236,6 +388,13 @@ export class PdfBuilder {
       width: tableWidth,
       height: rowHeight,
       color: COLORS.tableHeader
+    })
+    this.page.drawRectangle({
+      x: startX,
+      y: headerY - rowHeight + 4,
+      width: tableWidth,
+      height: 2,
+      color: COLORS.accent
     })
 
     for (const col of columns) {
@@ -251,19 +410,25 @@ export class PdfBuilder {
     }
     this.y = headerY - rowHeight
 
-    // Lignes
     for (let i = 0; i < rows.length; i++) {
       this.ensureSpace(rowHeight + 2)
       const row = rows[i]
       x = startX
-
-      if (row.highlight || i % 2 === 1) {
+      const fill = row.highlight ? COLORS.accentSoft : i % 2 === 1 ? COLORS.tableRowAlt : COLORS.white
+      this.page.drawRectangle({
+        x: startX,
+        y: this.y - rowHeight + 4,
+        width: tableWidth,
+        height: rowHeight,
+        color: fill
+      })
+      if (row.highlight) {
         this.page.drawRectangle({
           x: startX,
           y: this.y - rowHeight + 4,
-          width: tableWidth,
+          width: 3,
           height: rowHeight,
-          color: row.highlight ? COLORS.primaryLight : COLORS.tableRowAlt
+          color: COLORS.accent
         })
       }
 
@@ -280,57 +445,104 @@ export class PdfBuilder {
             : col.align === 'right'
               ? x + col.width - tw - 4
               : x + 4
-        this.drawText(fitted, tx, this.y - 10, size, row.bold || false)
+        this.drawText(fitted, tx, this.y - 10, size, row.bold || false, COLORS.text)
         x += col.width
       }
 
       this.y -= rowHeight
     }
 
-    this.moveY(8)
+    this.page.drawRectangle({
+      x: startX,
+      y: this.y + 4,
+      width: tableWidth,
+      height: 1.2,
+      color: COLORS.primary
+    })
+
+    this.moveY(10)
     return this
   }
 
   drawResultBox(label: string, value: string, color: RGB = COLORS.primary): this {
-    this.ensureSpace(36)
-    const boxWidth = 160
-    const x = MARGINS.left
-
+    this.ensureSpace(40)
+    const boxWidth = 170
     this.page.drawRectangle({
-      x,
-      y: this.y - 28,
+      x: MARGINS.left,
+      y: this.y - 30,
       width: boxWidth,
-      height: 32,
-      color: COLORS.primaryLight,
-      borderColor: color,
-      borderWidth: 1.5
+      height: 36,
+      color: COLORS.primary
     })
-    this.drawText(label, x + 8, this.y - 10, 7, false, COLORS.textMuted)
-    this.drawText(value, x + 8, this.y - 22, 12, true, color)
-    this.moveY(40)
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - 30,
+      width: 4,
+      height: 36,
+      color: COLORS.accent
+    })
+    this.drawText(label, MARGINS.left + 12, this.y - 10, 7, false, COLORS.accent)
+    this.drawText(value, MARGINS.left + 12, this.y - 24, 12, true, color === COLORS.primary ? COLORS.white : color)
+    this.moveY(44)
+    return this
+  }
+
+  drawHeroAmount(label: string, value: string): this {
+    this.ensureSpace(58)
+    const h = 48
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - 36,
+      width: this.contentWidth,
+      height: h,
+      color: COLORS.primary
+    })
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - 36,
+      width: this.contentWidth,
+      height: 4,
+      color: COLORS.accent
+    })
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - 36 + h - 4,
+      width: this.contentWidth,
+      height: 4,
+      color: COLORS.accent
+    })
+    this.drawCentered(label, A4.width / 2, this.y - 8, 8, true, COLORS.accent)
+    this.drawCentered(value, A4.width / 2, this.y - 26, 18, true, COLORS.white)
+    this.moveY(56)
     return this
   }
 
   drawResultRow(items: { label: string; value: string; color?: RGB }[]): this {
-    this.ensureSpace(40)
+    this.ensureSpace(48)
     const itemWidth = this.contentWidth / items.length
+    const h = 40
 
     items.forEach((item, i) => {
       const x = MARGINS.left + i * itemWidth
       this.page.drawRectangle({
-        x: x + 4,
-        y: this.y - 30,
-        width: itemWidth - 8,
-        height: 34,
-        color: COLORS.primaryLight,
-        borderColor: item.color || COLORS.primary,
-        borderWidth: 1
+        x: x + 3,
+        y: this.y - 32,
+        width: itemWidth - 6,
+        height: h,
+        color: COLORS.primary
       })
-      this.drawText(item.label, x + 12, this.y - 10, 7, false, COLORS.textMuted)
-      this.drawText(item.value, x + 12, this.y - 24, 11, true, item.color || COLORS.primary)
+      this.page.drawRectangle({
+        x: x + 3,
+        y: this.y - 32,
+        width: itemWidth - 6,
+        height: 3,
+        color: COLORS.accent
+      })
+      this.drawText(item.label, x + 12, this.y - 10, 6.5, true, COLORS.accent)
+      this.drawText(item.value, x + 12, this.y - 25, 11, true, item.color && item.color !== COLORS.primary ? item.color : COLORS.white)
     })
 
-    this.moveY(44)
+    this.moveY(50)
     return this
   }
 
@@ -340,23 +552,28 @@ export class PdfBuilder {
     const ratio = max > 0 ? normalized / max : 0
     const barX = MARGINS.left
     const barWidth = this.contentWidth
-    this.drawText('INDICE DE PERFORMANCE', barX, this.y, 7, true, COLORS.textMuted)
+    this.drawText('INDICE DE PERFORMANCE', barX, this.y, 7, true, COLORS.primary)
     this.moveY(12)
     this.page.drawRectangle({
       x: barX,
       y: this.y - 8,
       width: barWidth,
-      height: 10,
-      color: COLORS.borderLight
+      height: 11,
+      color: COLORS.primaryLight,
+      borderColor: COLORS.border,
+      borderWidth: 0.5
     })
-    this.page.drawRectangle({
-      x: barX,
-      y: this.y - 8,
-      width: barWidth * ratio,
-      height: 10,
-      color: ratio >= 0.7 ? COLORS.success : ratio >= 0.5 ? COLORS.accent : COLORS.danger
-    })
-    this.drawText(`${normalized.toFixed(2)} / ${max}`, barX + barWidth - 48, this.y + 6, 7, true)
+    const fillColor = ratio >= 0.7 ? COLORS.success : ratio >= 0.5 ? COLORS.accent : COLORS.danger
+    if (ratio > 0) {
+      this.page.drawRectangle({
+        x: barX + 1,
+        y: this.y - 7,
+        width: Math.max(4, (barWidth - 2) * ratio),
+        height: 9,
+        color: fillColor
+      })
+    }
+    this.drawText(`${normalized.toFixed(2)} / ${max}`, barX + barWidth - 52, this.y + 6, 7, true, COLORS.primary)
     this.moveY(22)
     return this
   }
@@ -365,36 +582,56 @@ export class PdfBuilder {
     this.ensureSpace(28)
     this.page.drawRectangle({
       x: MARGINS.left,
-      y: this.y - 13,
-      width: 4,
-      height: 17,
+      y: this.y - 14,
+      width: this.contentWidth,
+      height: 18,
+      color: COLORS.primaryLight
+    })
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - 14,
+      width: 5,
+      height: 18,
       color: COLORS.accent
     })
-    this.drawText(title.toUpperCase(), MARGINS.left + 10, this.y - 7, 9, true, COLORS.primary)
-    this.moveY(24)
+    this.drawText(title.toUpperCase(), MARGINS.left + 12, this.y - 8, 9, true, COLORS.primary)
+    this.moveY(26)
     return this
   }
 
   async drawVerificationQr(payload: string, verificationCode: string): Promise<this> {
-    this.ensureSpace(76)
+    this.ensureSpace(80)
     const dataUrl = await QRCode.toDataURL(payload, {
       errorCorrectionLevel: 'M',
       margin: 1,
       width: 160,
-      color: { dark: '#12325B', light: '#FFFFFF' }
+      color: { dark: '#002A8B', light: '#FFFFFF' }
     })
     const base64 = dataUrl.split(',')[1]
     const binary = atob(base64)
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
     const image = await this.doc.embedPng(bytes)
     const size = 58
-    const x = A4.width - MARGINS.right - size
-    const y = this.y - size + 5
-    this.page.drawImage(image, { x, y, width: size, height: size })
-    this.drawText('CONTRÔLE DU BULLETIN', MARGINS.left, this.y - 10, 8, true, COLORS.primary)
+    const boxH = 70
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - boxH + 8,
+      width: this.contentWidth,
+      height: boxH,
+      color: COLORS.cream,
+      borderColor: COLORS.border,
+      borderWidth: 0.6
+    })
+    this.page.drawImage(image, {
+      x: A4.width - MARGINS.right - size - 10,
+      y: this.y - size + 2,
+      width: size,
+      height: size
+    })
+    this.drawText('CONTRÔLE DU BULLETIN', MARGINS.left + 10, this.y - 10, 8, true, COLORS.primary)
     this.drawText(
       `Référence de contrôle : ${verificationCode}`,
-      MARGINS.left,
+      MARGINS.left + 10,
       this.y - 26,
       8,
       false,
@@ -402,43 +639,89 @@ export class PdfBuilder {
     )
     this.drawText(
       'Le QR code contient le matricule, la période et les résultats de contrôle.',
-      MARGINS.left,
+      MARGINS.left + 10,
       this.y - 40,
       7,
       false,
       COLORS.textMuted
     )
-    this.moveY(70)
+    this.moveY(78)
     return this
   }
 
   drawParagraph(title: string, text: string, indent = 0): this {
-    this.ensureSpace(30)
+    const lines = wrapParagraph(text, 82)
+    const boxH = (title ? 16 : 0) + lines.length * 13 + 16
+    this.ensureSpace(boxH + 6)
+    this.page.drawRectangle({
+      x: MARGINS.left + indent,
+      y: this.y - boxH + 12,
+      width: this.contentWidth - indent,
+      height: boxH,
+      color: COLORS.accentSoft,
+      borderColor: COLORS.accentDark,
+      borderWidth: 0.5
+    })
+    this.page.drawRectangle({
+      x: MARGINS.left + indent,
+      y: this.y - boxH + 12,
+      width: 4,
+      height: boxH,
+      color: COLORS.accent
+    })
+    this.moveY(4)
     if (title) {
-      this.drawText(title, MARGINS.left + indent, this.y, 9, true)
+      this.drawText(title, MARGINS.left + indent + 12, this.y, 8, true, COLORS.primary)
       this.moveY(14)
     }
-    const lines = wrapParagraph(text, 85)
     for (const line of lines) {
-      this.ensureSpace(14)
-      this.drawText(line, MARGINS.left + indent, this.y, 9)
+      this.drawText(line, MARGINS.left + indent + 12, this.y, 9)
       this.moveY(13)
     }
-    this.moveY(6)
+    this.moveY(12)
     return this
   }
 
   /** Corps d'attestation avec texte légal */
   drawAttestationBody(paragraphs: string[]): this {
+    const lines: { text: string; gap: boolean }[] = []
     for (const p of paragraphs) {
-      const lines = wrapParagraph(p, 82)
-      for (const line of lines) {
-        this.ensureSpace(14)
-        this.drawText(line, MARGINS.left, this.y, 10)
-        this.moveY(14)
+      if (!p) {
+        lines.push({ text: '', gap: true })
+        continue
       }
-      this.moveY(8)
+      const wrapped = wrapParagraph(p, 80)
+      wrapped.forEach((text, i) => lines.push({ text, gap: i === wrapped.length - 1 }))
     }
+    const boxH = lines.reduce((h, l) => h + (l.text ? 14 : 8), 24)
+    this.ensureSpace(boxH + 8)
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - boxH + 14,
+      width: this.contentWidth,
+      height: boxH,
+      color: COLORS.cream,
+      borderColor: COLORS.primary,
+      borderWidth: 0.8
+    })
+    this.page.drawRectangle({
+      x: MARGINS.left + 3,
+      y: this.y - boxH + 17,
+      width: this.contentWidth - 6,
+      height: boxH - 6,
+      borderColor: COLORS.accent,
+      borderWidth: 0.6
+    })
+    this.moveY(10)
+    for (const line of lines) {
+      if (!line.text) {
+        this.moveY(8)
+        continue
+      }
+      this.drawText(line.text, MARGINS.left + 14, this.y, 10)
+      this.moveY(line.gap ? 16 : 14)
+    }
+    this.moveY(8)
     return this
   }
 
@@ -446,69 +729,83 @@ export class PdfBuilder {
     blocks: { title: string; subtitle?: string }[],
     dateLabel?: string
   ): this {
-    this.ensureSpace(80)
+    this.ensureSpace(96)
 
     if (dateLabel) {
-      const cx = A4.width / 2
-      this.drawCentered(dateLabel, cx, this.y, 9)
-      this.moveY(24)
+      this.page.drawText(dateLabel, {
+        x: A4.width / 2 - this.fontItalic.widthOfTextAtSize(sanitizeText(dateLabel), 9) / 2,
+        y: this.y,
+        size: 9,
+        font: this.fontItalic,
+        color: COLORS.text
+      })
+      this.moveY(18)
     }
 
-    this.drawHorizontalLine()
-    this.moveY(20)
-
     const blockWidth = this.contentWidth / blocks.length
+    const boxH = 62
     blocks.forEach((block, i) => {
-      const x = MARGINS.left + i * blockWidth + blockWidth / 2
-      this.drawCentered(block.title, x, this.y, 9, true)
+      const x = MARGINS.left + i * blockWidth + 6
+      const w = blockWidth - 12
+      this.page.drawRectangle({
+        x,
+        y: this.y - boxH + 8,
+        width: w,
+        height: boxH,
+        color: COLORS.white,
+        borderColor: COLORS.primary,
+        borderWidth: 0.8
+      })
+      this.page.drawRectangle({
+        x,
+        y: this.y - boxH + 8 + boxH - 3,
+        width: w,
+        height: 3,
+        color: COLORS.accent
+      })
+      const cx = x + w / 2
+      this.drawCentered(block.title, cx, this.y - 6, 8.5, true, COLORS.primary)
       if (block.subtitle) {
-        this.drawCentered(block.subtitle, x, this.y - 14, 7, false, COLORS.textMuted)
+        this.drawCentered(block.subtitle, cx, this.y - 18, 7, false, COLORS.textMuted)
       }
-      // Ligne signature
-      const lineW = 120
+      const lineW = Math.min(130, w - 24)
       this.page.drawLine({
-        start: { x: x - lineW / 2, y: this.y - 50 },
-        end: { x: x + lineW / 2, y: this.y - 50 },
-        thickness: 0.5,
+        start: { x: cx - lineW / 2, y: this.y - 48 },
+        end: { x: cx + lineW / 2, y: this.y - 48 },
+        thickness: 0.6,
         color: COLORS.border
       })
     })
 
-    this.moveY(60)
+    this.moveY(70)
     return this
   }
 
   drawHorizontalLine(): this {
-    this.page.drawLine({
-      start: { x: MARGINS.left, y: this.y },
-      end: { x: A4.width - MARGINS.right, y: this.y },
-      thickness: 0.5,
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y,
+      width: this.contentWidth,
+      height: 0.6,
       color: COLORS.border
     })
     return this
   }
 
   drawFooter(): this {
-    const footerY = MARGINS.bottom - 5
-    this.page.drawLine({
-      start: { x: MARGINS.left, y: footerY + 12 },
-      end: { x: A4.width - MARGINS.right, y: footerY + 12 },
-      thickness: 0.3,
-      color: COLORS.borderLight
-    })
-
+    const footerY = FRAME + 9
     const left = `Généré le ${todayFormatted()}`
-    this.drawText(left, MARGINS.left, footerY, 6.5, false, COLORS.textMuted)
+    this.drawText(left, MARGINS.left, footerY, 6.5, false, COLORS.accentSoft)
 
     if (this.documentNumber) {
       const num = `N° ${this.documentNumber}`
-      const nw = this.textWidth(num, 6.5)
-      this.drawText(num, A4.width / 2 - nw / 2, footerY, 6.5, false, COLORS.textMuted)
+      const nw = this.textWidth(num, 6.5, true)
+      this.drawText(num, A4.width / 2 - nw / 2, footerY, 6.5, true, COLORS.white)
     }
 
     const pageLabel = `Page ${this.pageNum}`
     const pw = this.textWidth(pageLabel, 6.5)
-    this.drawText(pageLabel, A4.width - MARGINS.right - pw, footerY, 6.5, false, COLORS.textMuted)
+    this.drawText(pageLabel, A4.width - MARGINS.right - pw, footerY, 6.5, false, COLORS.accent)
 
     return this
   }
@@ -563,7 +860,6 @@ function sanitizeText(text: string): string {
     .replace(/—/g, '-')
     .replace(/²/g, '2')
     .replace(/³/g, '3')
-  // Helvetica / WinAnsi : ASCII + Latin-1. Le reste (ex. espace insécable fine 0x202F) casse le PDF.
   return mapped.replace(/[^\u0009\u000A\u000D\u0020-\u007E\u00A0-\u00FF]/g, '?')
 }
 

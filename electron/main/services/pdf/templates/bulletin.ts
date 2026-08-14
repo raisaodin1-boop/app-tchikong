@@ -13,9 +13,10 @@ export async function templateBulletin(data: BulletinData): Promise<Uint8Array> 
   builder.drawOfficialHeader()
   builder.drawDocumentTitle(
     'BULLETIN SCOLAIRE',
-    `${data.periode.libelle}  •  ${data.annee_libelle}  •  Édition certifiée`
+    `${data.periode.libelle}   |   ${data.annee_libelle}   |   Édition officielle`
   )
 
+  builder.drawSectionTitle('Identité de l’élève')
   builder.drawInfoGrid([
     { label: 'Nom', value: data.eleve.nom.toUpperCase() },
     { label: 'Prénom', value: data.eleve.prenom },
