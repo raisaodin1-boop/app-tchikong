@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration 002: Sessions persistantes + index finances
+-- Migration 005: Sessions persistantes + index finances
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS sessions (

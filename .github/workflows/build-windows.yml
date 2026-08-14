@@ -5,7 +5,9 @@ on:
   push:
     branches:
       - main
-      - cursor/tchikong-school-app-bbfb
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
@@ -21,7 +23,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build application
         env:

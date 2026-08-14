@@ -1,5 +1,8 @@
-import { basename } from 'path'
-import { getDb, logActivity } from '../../../db/database'
+import { getDb, logActivity } from '@database'
+
+function fileBasename(value: string): string {
+  return value.split(/[/\\]/).pop() || value
+}
 import type { TypeDocumentOfficiel } from '../../../shared/types'
 
 export interface AttestationData {
@@ -149,7 +152,7 @@ export function enregistrerDocumentOfficiel(
     )
     .get(prefix, `${prefix}%`) as { n: number | null }
   const numero = `${prefix}${String((row.n || 0) + 1).padStart(5, '0')}`
-  const fichier = basename(numeroOuChemin || '') || numero
+  const fichier = fileBasename(numeroOuChemin || '') || numero
 
   getDb()
     .prepare(

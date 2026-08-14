@@ -18,13 +18,45 @@ Application desktop de gestion scolaire pour le **Groupe Scolaire Bilingue Prima
 | Gestion des élèves (CRUD, recherche, présence, statuts) | ✅ |
 | Scolarité (notes, moyennes, bulletins PDF, palmarès) | ✅ |
 | Documents PDF (attestations, certificats, listes) | ✅ |
-| Finances (paiements, reçus PDF, impayés, dépenses, tarifs) | ✅ |
-| Administratif (personnel, classes, années, utilisateurs, documents) | ✅ |
+| Finances (paiements, reçus PDF, impayés, dépenses) | ✅ |
+| Administratif (personnel, classes, utilisateurs, documents) | ✅ |
+| Démarrage d'année et modules de frais configurables par la directrice | ✅ |
+| Paie mensuelle du personnel avec validation et journal automatique | ✅ |
+| Bilan annuel par classe et par élève, exportable vers Excel | ✅ |
+| Bulletins premium avec statistiques de classe et QR de contrôle | ✅ |
 
-## ⚠️ Important : ce n'est PAS un site web
+## Deux modes entièrement hors connexion
 
-Cette application est une **application de bureau Windows** (Electron).  
-**Vercel ne peut pas l'héberger.** Elle s'installe et tourne sur votre PC.
+- **Application Windows (Electron)** : données dans une base SQLite sur le PC.
+- **Application navigateur installable (PWA)** : tous les modules utilisent SQLite WebAssembly et
+  enregistrent la base dans le stockage local du navigateur (IndexedDB).
+
+Vercel sert uniquement les fichiers de l'application. Après la première ouverture et
+l'installation de la PWA, les écrans, le moteur SQLite et la génération PDF fonctionnent sans
+Internet. Aucune donnée scolaire n'est envoyée à Vercel ou à une API distante.
+
+> Les données du navigateur appartiennent au navigateur et à l'appareil utilisés. Utilisez
+> régulièrement **Sauvegarder** pour télécharger une copie `.db`, et **Restaurer** pour la
+> réimporter. Ne videz pas les données du site sans sauvegarde.
+
+### Début d'une année scolaire
+
+Dans **Administration → Années scolaires**, la directrice démarre la nouvelle année. Les classes
+et capacités de l'année précédente sont copiées, sans copier les élèves ni les paiements. Elle est
+ensuite dirigée vers **Administration → Frais scolaires** pour créer chaque module à payer
+(scolarité, inscription, tenues, fournitures ou module libre) avec :
+
+- un prix unique applicable à toutes les classes ; ou
+- un montant obligatoire défini séparément pour chaque classe.
+
+Le personnel actif est également inscrit dans la nouvelle année. Dans
+**Administration → Paie du personnel**, la directrice définit les salaires mensuels puis confirme,
+mois par mois, ceux qui ont été effectivement perçus. Chaque validation crée automatiquement la
+dépense correspondante.
+
+Le **Bilan annuel** du module Finances consolide les effectifs, montants attendus, montants perçus,
+impayés, salaires, autres dépenses et solde. Il contient un journal individuel de tous les élèves
+et peut être exporté en CSV compatible Excel.
 
 ---
 
@@ -74,6 +106,27 @@ Ou utilisez la **Méthode B** (installateur pré-compilé sur GitHub Actions).
 | `secretaire` | `secret123` | Secrétariat |
 | `comptable` | `compta123` | Comptable |
 
+## Version navigateur / Vercel
+
+```bash
+npm install
+npm run dev:web
+```
+
+Build de production :
+
+```bash
+npm run build:web
+```
+
+Le dossier `dist/` obtenu est l'artefact web autonome. Il peut être déployé sur Vercel (le fichier
+`vercel.json` configure automatiquement le build) ou servi sur le réseau local avec un serveur
+HTTP statique. Un simple double-clic sur `index.html` n'est pas pris en charge, car les fonctions
+hors connexion et SQLite WebAssembly exigent une origine HTTP locale.
+
+Sur Vercel, ouvrez l'application une première fois avec Internet, puis choisissez
+**Installer l'application** dans le navigateur. Elle pourra ensuite démarrer hors connexion.
+
 ## Structure du projet
 
 ```
@@ -90,15 +143,7 @@ shared/            # Types TypeScript partagés
 
 ## Sauvegarde
 
-La base de données SQLite est stockée localement. Utilisez **Sauvegarder** / **Restaurer** dans la barre latérale pour exporter ou réimporter un fichier `.db`.
-
-## Droits d'accès
-
-| Rôle | Accès |
-|------|--------|
-| Directrice | Tous les modules |
-| Secrétariat | Tableau de bord, élèves, présences, scolarité, administratif (sauf utilisateurs) |
-| Comptable | Tableau de bord, élèves, finances |
+La base de données SQLite est stockée localement. Utilisez le bouton **Sauvegarder** dans la barre latérale pour exporter une copie vers un fichier `.db`.
 
 ## Licence
 

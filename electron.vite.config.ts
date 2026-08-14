@@ -5,6 +5,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    resolve: {
+      alias: {
+        '@database': resolve(__dirname, 'db/database.ts')
+      }
+    },
     build: {
       rollupOptions: {
         input: {
@@ -33,7 +38,8 @@ export default defineConfig({
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src'),
-        '@shared': resolve(__dirname, 'shared')
+        '@shared': resolve(__dirname, 'shared'),
+        '@database': resolve(__dirname, 'src/browser/database.ts')
       }
     },
     plugins: [react()]

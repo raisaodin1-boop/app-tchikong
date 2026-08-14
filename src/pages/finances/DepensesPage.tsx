@@ -7,7 +7,6 @@ import { formatMoney } from '../../lib/money'
 import type { Depense, TypeDepense } from '@shared/types'
 
 const TYPE_OPTIONS: { value: TypeDepense; label: string }[] = [
-  { value: 'salaire', label: 'Salaire' },
   { value: 'charge', label: 'Charge' },
   { value: 'fourniture', label: 'Fourniture' },
   { value: 'maintenance', label: 'Maintenance' },
@@ -15,7 +14,7 @@ const TYPE_OPTIONS: { value: TypeDepense; label: string }[] = [
 ]
 
 export default function DepensesPage() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const { anneeActive } = useApp()
   const [depenses, setDepenses] = useState<Depense[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -60,11 +59,20 @@ export default function DepensesPage() {
 
   const total = depenses.reduce((s, d) => s + d.montant, 0)
 
+  if (!['directrice', 'comptable'].includes(user?.role || '')) {
+    return (
+      <div className="card p-8 text-center text-red-600">
+        Accès réservé à la direction et à la comptabilité.
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-500">
           Total des dépenses : <strong className="text-accent-red">{formatMoney(total)}</strong>
+          <span className="ml-2 text-xs">Les salaires sont ajoutés depuis Administration → Paie.</span>
         </p>
         <button className="btn-primary btn-sm" onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4" />

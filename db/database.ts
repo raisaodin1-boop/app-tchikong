@@ -63,7 +63,10 @@ function runMigrations(database: Database.Database): void {
 
   const migrationFiles = [
     { version: 1, file: '001_initial_schema.sql', name: 'initial_schema' },
-    { version: 2, file: '002_sessions.sql', name: 'sessions_persistantes' }
+    { version: 2, file: '002_app_settings.sql', name: 'app_settings' },
+    { version: 3, file: '003_fee_modules.sql', name: 'fee_modules' },
+    { version: 4, file: '004_payroll.sql', name: 'payroll' },
+    { version: 5, file: '005_sessions.sql', name: 'sessions_persistantes' }
   ]
 
   for (const migration of migrationFiles) {

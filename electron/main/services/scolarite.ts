@@ -1,4 +1,4 @@
-import { getDb, logActivity } from '../../../db/database'
+import { getDb, logActivity } from '@database'
 import type {
   Bulletin,
   Matiere,
@@ -15,7 +15,13 @@ export interface NoteInput {
 }
 
 export interface NotesGrid {
-  classe: { id: number; nom: string; section_id: number; section_code: string }
+  classe: {
+    id: number
+    nom: string
+    section_id: number
+    section_code: string
+    annee_scolaire_id: number
+  }
   periode: PeriodeEvaluation
   matieres: Matiere[]
   eleves: { eleve_id: number; nom: string; prenom: string; matricule: string }[]
@@ -38,6 +44,7 @@ export interface EleveMoyenne {
     note_sur: number
     note_sur_20: number
     moyenne_matiere: number
+    appreciation: string | null
   }[]
 }
 
@@ -49,6 +56,12 @@ export interface BulletinData {
   moyenne: EleveMoyenne
   appreciation_maitre: string | null
   bulletin: Bulletin | null
+  statistiques_classe: {
+    moyenne_classe: number
+    meilleure_moyenne: number
+    plus_faible_moyenne: number
+    effectif: number
+  }
 }
 
 export function listMatieres(sectionId: number): Matiere[] {
@@ -78,7 +91,7 @@ export function getNotesGrid(classeId: number, periodeId: number): NotesGrid | n
 
   const classe = db
     .prepare(
-      `SELECT c.id, c.nom, c.section_id, s.code as section_code
+      `SELECT c.id, c.nom, c.section_id, c.annee_scolaire_id, s.code as section_code
        FROM classes c JOIN sections s ON s.id = c.section_id WHERE c.id = ?`
     )
     .get(classeId) as NotesGrid['classe'] | undefined
@@ -90,6 +103,7 @@ export function getNotesGrid(classeId: number, periodeId: number): NotesGrid | n
     .get(periodeId) as PeriodeEvaluation | undefined
 
   if (!periode) return null
+  if (periode.annee_scolaire_id !== classe.annee_scolaire_id) return null
 
   const matieres = listMatieres(classe.section_id)
 
@@ -152,8 +166,8 @@ export function saveNotes(
         ).run(n.eleve_id, matiereId, periodeId)
         continue
       }
-      if (n.valeur < 0 || n.valeur > noteSur) {
-        throw new Error(`Note invalide pour l'élève ${n.eleve_id} : ${n.valeur}/${noteSur}`)
+      if (noteSur <= 0 || n.valeur < 0 || n.valeur > noteSur) {
+        throw new Error(`Note invalide pour l'élève ${n.eleve_id} : valeur attendue entre 0 et ${noteSur}`)
       }
       upsert.run(
         n.eleve_id,
@@ -211,7 +225,8 @@ export function calculerMoyennesClasse(classeId: number, periodeId: number): Ele
         valeur: note.valeur,
         note_sur: note.note_sur,
         note_sur_20: Math.round(noteSur20 * 100) / 100,
-        moyenne_matiere: Math.round(noteSur20 * 100) / 100
+        moyenne_matiere: Math.round(noteSur20 * 100) / 100,
+        appreciation: note.appreciation ?? null
       })
     }
 
@@ -317,7 +332,6 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
   const periode = db
     .prepare('SELECT * FROM periodes_evaluation WHERE id = ?')
     .get(periodeId) as PeriodeEvaluation | undefined
-
   if (!periode) return null
 
   const inscription = db
@@ -329,7 +343,7 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
        JOIN niveaux n ON n.id = i.niveau_id
        JOIN annees_scolaires a ON a.id = i.annee_scolaire_id
        WHERE i.eleve_id = ? AND i.annee_scolaire_id = ?
-       LIMIT 1`
+       ORDER BY i.date_inscription DESC LIMIT 1`
     )
     .get(eleveId, periode.annee_scolaire_id) as {
     classe_nom: string
@@ -349,6 +363,12 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
   const bulletin = db
     .prepare('SELECT * FROM bulletins WHERE eleve_id = ? AND periode_id = ?')
     .get(eleveId, periodeId) as Bulletin | undefined
+  const ranked = moyennes.filter((item) => item.details.length > 0)
+  const moyenneClasse =
+    ranked.length > 0
+      ? Math.round((ranked.reduce((sum, item) => sum + item.moyenne, 0) / ranked.length) * 100) /
+        100
+      : 0
 
   return {
     eleve,
@@ -361,7 +381,14 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
     annee_libelle: inscription.annee_libelle,
     moyenne,
     appreciation_maitre: bulletin?.appreciation_maitre ?? null,
-    bulletin: bulletin ?? null
+    bulletin: bulletin ?? null,
+    statistiques_classe: {
+      moyenne_classe: moyenneClasse,
+      meilleure_moyenne: ranked.length > 0 ? Math.max(...ranked.map((item) => item.moyenne)) : 0,
+      plus_faible_moyenne:
+        ranked.length > 0 ? Math.min(...ranked.map((item) => item.moyenne)) : 0,
+      effectif: ranked.length
+    }
   }
 }
 

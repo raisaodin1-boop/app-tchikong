@@ -3,18 +3,7 @@ import { Search, Save, Printer, CheckCircle } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
-import { formatMoney } from '../../lib/money'
-import type { Inscription, ModePaiement, SituationFinanciere, TypeFrais, Paiement } from '@shared/types'
-
-const TYPE_FRAIS_OPTIONS: { value: TypeFrais; label: string }[] = [
-  { value: 'scolarite', label: 'Frais de scolarité' },
-  { value: 'inscription', label: 'Inscription' },
-  { value: 'uniforme', label: 'Uniforme' },
-  { value: 'fournitures', label: 'Fournitures' },
-  { value: 'examen', label: 'Examen' },
-  { value: 'activite', label: 'Activités' },
-  { value: 'autre', label: 'Autre' }
-]
+import type { Inscription, ModePaiement, SituationFinanciere, Paiement } from '@shared/types'
 
 const MODE_OPTIONS: { value: ModePaiement; label: string }[] = [
   { value: 'especes', label: 'Espèces' },
@@ -22,6 +11,10 @@ const MODE_OPTIONS: { value: ModePaiement; label: string }[] = [
   { value: 'cheque', label: 'Chèque' },
   { value: 'virement', label: 'Virement' }
 ]
+
+function formatMoney(n: number) {
+  return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
+}
 
 export default function PaiementPage() {
   const { token } = useAuth()
@@ -32,7 +25,7 @@ export default function PaiementPage() {
   const [eleveSelectionne, setEleveSelectionne] = useState<Inscription | null>(null)
   const [situation, setSituation] = useState<SituationFinanciere | null>(null)
   const [form, setForm] = useState({
-    type_frais: 'scolarite' as TypeFrais,
+    frais_modele_id: 0,
     montant: '',
     mode_paiement: 'especes' as ModePaiement,
     date_paiement: new Date().toISOString().slice(0, 10),
@@ -40,6 +33,7 @@ export default function PaiementPage() {
   })
   const [saving, setSaving] = useState(false)
   const [dernierPaiement, setDernierPaiement] = useState<Paiement | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (recherche.length < 2) {
@@ -62,9 +56,15 @@ export default function PaiementPage() {
       const sit = await window.api.getSituationFinanciere(eleve.eleve_id, anneeActive.id)
       setSituation(sit)
       if (sit) {
-        const detail = sit.details.find((d: SituationFinanciere['details'][number]) => d.type_frais === 'scolarite')
-        if (detail && detail.reste > 0) {
-          setForm((f) => ({ ...f, type_frais: 'scolarite', montant: String(detail.reste) }))
+        const detail = sit.details.find(
+          (d: SituationFinanciere['details'][number]) => d.type_frais === 'scolarite'
+        ) ?? sit.details.find((item: SituationFinanciere['details'][number]) => item.reste > 0)
+        if (detail) {
+          setForm((f) => ({
+            ...f,
+            frais_modele_id: detail.frais_modele_id,
+            montant: detail.reste > 0 ? String(detail.reste) : ''
+          }))
         }
       }
     }
@@ -73,28 +73,32 @@ export default function PaiementPage() {
   useEffect(() => {
     const eleveId = Number(searchParams.get('eleve'))
     if (!eleveId || !anneeActive) return
-    window.api.getEleve(eleveId, anneeActive.id).then((data: {
-      eleve: { id: number; nom: string; prenom: string; matricule: string }
-      inscription: Inscription | null
-    } | null) => {
-      if (!data?.inscription && !data?.eleve) return
-      const ins = data.inscription
-      void selectionnerEleve({
-        ...(ins || {}),
-        eleve_id: data.eleve.id,
-        nom: data.eleve.nom,
-        prenom: data.eleve.prenom,
-        matricule: data.eleve.matricule
-      } as Inscription)
-    })
+    window.api
+      .getEleve(eleveId, anneeActive.id)
+      .then(
+        (data: {
+          eleve: { id: number; nom: string; prenom: string; matricule: string }
+          inscription: Inscription | null
+        } | null) => {
+          if (!data?.inscription && !data?.eleve) return
+          const ins = data.inscription
+          void selectionnerEleve({
+            ...(ins || {}),
+            eleve_id: data.eleve.id,
+            nom: data.eleve.nom,
+            prenom: data.eleve.prenom,
+            matricule: data.eleve.matricule
+          } as Inscription)
+        }
+      )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, anneeActive?.id])
 
-  const handleTypeChange = (type: TypeFrais) => {
-    const detail = situation?.details.find((d) => d.type_frais === type)
+  const handleTypeChange = (id: number) => {
+    const detail = situation?.details.find((item) => item.frais_modele_id === id)
     setForm((f) => ({
       ...f,
-      type_frais: type,
+      frais_modele_id: id,
       montant: detail && detail.reste > 0 ? String(detail.reste) : f.montant
     }))
   }
@@ -104,25 +108,20 @@ export default function PaiementPage() {
     if (!token || !anneeActive || !eleveSelectionne) return
     const montant = Number(form.montant)
     if (!montant || montant <= 0) return
-
-    const detail = situation?.details.find((d) => d.type_frais === form.type_frais)
-    if (detail && montant > detail.reste) {
-      if (
-        !confirm(
-          `Le montant (${montant} FCFA) dépasse le reste dû (${detail.reste} FCFA). Enregistrer quand même ?`
-        )
-      ) {
-        return
-      }
-    }
+    const selectedFee = situation?.details.find(
+      (detail) => detail.frais_modele_id === form.frais_modele_id
+    )
+    if (!selectedFee) return
 
     setSaving(true)
+    setError('')
     try {
       const paiement = await window.api.createPaiement(
         {
           eleve_id: eleveSelectionne.eleve_id,
           annee_scolaire_id: anneeActive.id,
-          type_frais: form.type_frais,
+          type_frais: selectedFee.type_frais,
+          frais_modele_id: selectedFee.frais_modele_id,
           montant,
           mode_paiement: form.mode_paiement,
           date_paiement: form.date_paiement,
@@ -133,9 +132,8 @@ export default function PaiementPage() {
       setDernierPaiement(paiement)
       const sit = await window.api.getSituationFinanciere(eleveSelectionne.eleve_id, anneeActive.id)
       setSituation(sit)
-      setForm((f) => ({ ...f, montant: '', notes: '' }))
-    } catch (err) {
-      alert((err as Error).message || 'Erreur lors de l\'enregistrement')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "L'enregistrement a échoué")
     } finally {
       setSaving(false)
     }
@@ -192,10 +190,12 @@ export default function PaiementPage() {
             Situation de {situation.prenom} {situation.nom}
             <span className={`ml-2 badge ${
               situation.statut === 'a_jour' ? 'badge-green' :
-              situation.statut === 'partiel' ? 'badge-yellow' : 'badge-red'
+              situation.statut === 'partiel' ? 'badge-yellow' :
+              situation.statut === 'non_configure' ? 'badge-gray' : 'badge-red'
             }`}>
               {situation.statut === 'a_jour' ? 'À jour' :
-               situation.statut === 'partiel' ? 'Paiement partiel' : 'Impayé'}
+               situation.statut === 'partiel' ? 'Paiement partiel' :
+               situation.statut === 'non_configure' ? 'Frais non configurés' : 'Impayé'}
             </span>
           </h3>
           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -223,7 +223,7 @@ export default function PaiementPage() {
             </thead>
             <tbody>
               {situation.details.map((d) => (
-                <tr key={d.type_frais} className="border-t border-gray-100">
+                <tr key={d.frais_modele_id} className="border-t border-gray-100">
                   <td className="py-1.5">{d.libelle}</td>
                   <td className="py-1.5 text-right">{formatMoney(d.montant_du)}</td>
                   <td className="py-1.5 text-right text-accent-green">{formatMoney(d.montant_paye)}</td>
@@ -241,16 +241,25 @@ export default function PaiementPage() {
       {eleveSelectionne && (
         <form onSubmit={handleSubmit} className="card p-5">
           <h3 className="font-semibold mb-4">Enregistrer un paiement</h3>
+          {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="label">Type de frais</label>
+              <label className="label">Module à payer</label>
               <select
                 className="input"
-                value={form.type_frais}
-                onChange={(e) => handleTypeChange(e.target.value as TypeFrais)}
+                value={form.frais_modele_id}
+                onChange={(e) => handleTypeChange(Number(e.target.value))}
+                required
               >
-                {TYPE_FRAIS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                <option value={0}>Sélectionner un module</option>
+                {situation?.details.map((detail) => (
+                  <option
+                    key={detail.frais_modele_id}
+                    value={detail.frais_modele_id}
+                    disabled={detail.reste <= 0}
+                  >
+                    {detail.libelle} — reste {formatMoney(detail.reste)}
+                  </option>
                 ))}
               </select>
             </div>

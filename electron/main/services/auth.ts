@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
-import { getDb, logActivity } from '../../../db/database'
+import { getDb, logActivity } from '@database'
 import type { AuthSession, LoginRequest, RoleUtilisateur, Utilisateur } from '../../../shared/types'
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000
@@ -96,6 +96,34 @@ export function getSession(token: string): AuthSession | null {
   return { utilisateur: mapUtilisateur(user), token }
 }
 
+export function restoreSession(
+  token: string,
+  utilisateurId: number,
+  expiresAt: number
+): AuthSession | null {
+  if (!token || expiresAt < Date.now()) return null
+  const db = getDb()
+  const user = db
+    .prepare('SELECT id, username, nom, prenom, role, actif, created_at FROM utilisateurs WHERE id = ?')
+    .get(utilisateurId) as
+    | {
+        id: number
+        username: string
+        nom: string
+        prenom: string
+        role: RoleUtilisateur
+        actif: number
+        created_at: string
+      }
+    | undefined
+  if (!user || !user.actif) return null
+  db.prepare(
+    `INSERT INTO sessions (token, utilisateur_id, expires_at) VALUES (?, ?, ?)
+     ON CONFLICT(token) DO UPDATE SET utilisateur_id = excluded.utilisateur_id, expires_at = excluded.expires_at`
+  ).run(token, utilisateurId, expiresAt)
+  return { utilisateur: mapUtilisateur(user), token }
+}
+
 export function logout(token: string): void {
   const db = getDb()
   const session = db
@@ -105,6 +133,10 @@ export function logout(token: string): void {
     logActivity(session.utilisateurId, 'deconnexion', 'utilisateur', session.utilisateurId)
   }
   db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+}
+
+export function clearSessions(): void {
+  getDb().prepare('DELETE FROM sessions').run()
 }
 
 export function getCurrentUserId(token: string): number | null {

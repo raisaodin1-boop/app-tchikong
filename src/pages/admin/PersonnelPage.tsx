@@ -25,7 +25,7 @@ const emptyForm: PersonnelFormData = {
 }
 
 export default function PersonnelPage() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const [personnel, setPersonnel] = useState<Enseignant[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Enseignant | null>(null)
@@ -89,10 +89,12 @@ export default function PersonnelPage() {
           />
           Actifs uniquement
         </label>
-        <button className="btn-primary btn-sm" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Ajouter
-        </button>
+        {user?.role === 'directrice' && (
+          <button className="btn-primary btn-sm" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Ajouter
+          </button>
+        )}
       </div>
 
       {showForm && (
@@ -184,9 +186,11 @@ export default function PersonnelPage() {
                     </span>
                   </td>
                   <td>
-                    <button className="btn-icon" onClick={() => openEdit(p)} title="Modifier">
-                      <Pencil className="h-4 w-4" />
-                    </button>
+                    {user?.role === 'directrice' && (
+                      <button className="btn-icon" onClick={() => openEdit(p)} title="Modifier">
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

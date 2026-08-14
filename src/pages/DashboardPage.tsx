@@ -45,7 +45,7 @@ function StatCard({
 
 export default function DashboardPage() {
   const { anneeActive } = useApp()
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [seeding, setSeeding] = useState(false)
 
@@ -54,8 +54,9 @@ export default function DashboardPage() {
   }, [anneeActive?.id])
 
   const handleSeed = async () => {
+    if (!token || user?.role !== 'directrice') return
     setSeeding(true)
-    const result = await window.api.seedDemo()
+    const result = await window.api.seedDemo(token)
     alert(result.message)
     window.location.reload()
   }
@@ -73,14 +74,14 @@ export default function DashboardPage() {
             {anneeActive && ` — ${anneeActive.libelle}`}
           </p>
         </div>
-        {!anneeActive && (
+        {!anneeActive && user?.role === 'directrice' && (
           <button className="btn-primary" onClick={handleSeed} disabled={seeding}>
             {seeding ? 'Chargement...' : 'Charger les données de démonstration'}
           </button>
         )}
       </div>
 
-      {!anneeActive && (
+      {!anneeActive && user?.role === 'directrice' && (
         <div className="card p-8 text-center mb-6">
           <p className="text-gray-500 mb-4">
             Aucune année scolaire active. Chargez les données de démonstration pour commencer.

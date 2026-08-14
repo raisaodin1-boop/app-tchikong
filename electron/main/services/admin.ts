@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs'
-import { getDb, logActivity } from '../../../db/database'
+import { getDb, logActivity } from '@database'
 import type {
   Classe,
+  DemoResetResult,
+  DemoStatus,
   DocumentOfficiel,
   Enseignant,
   JournalActivite,
@@ -389,4 +391,71 @@ export function updateClasse(
     .get(id) as Classe
 
   return row
+}
+
+// --- Mode démonstration ---
+
+export function getDemoStatus(): DemoStatus {
+  const setting = getDb()
+    .prepare(`SELECT value FROM app_settings WHERE key = 'demo_mode'`)
+    .get() as { value: string } | undefined
+  const eleves = (
+    getDb().prepare('SELECT COUNT(*) as c FROM eleves').get() as { c: number }
+  ).c
+  return { active: setting?.value === '1', eleves }
+}
+
+export function exitDemoMode(userId?: number): DemoResetResult {
+  const db = getDb()
+  if (!getDemoStatus().active) {
+    throw new Error("L'application n'est pas en mode démonstration")
+  }
+
+  const deleted = {
+    eleves: (db.prepare('SELECT COUNT(*) as c FROM eleves').get() as { c: number }).c,
+    paiements: (db.prepare('SELECT COUNT(*) as c FROM paiements').get() as { c: number }).c,
+    personnel: (db.prepare('SELECT COUNT(*) as c FROM enseignants').get() as { c: number }).c
+  }
+
+  const reset = db.transaction(() => {
+    db.prepare('DELETE FROM documents_officiels').run()
+    db.prepare('DELETE FROM bulletins').run()
+    db.prepare('DELETE FROM notes').run()
+    db.prepare('DELETE FROM presences_eleves').run()
+    db.prepare('DELETE FROM historique_eleves').run()
+    db.prepare('DELETE FROM documents_eleves').run()
+    db.prepare('DELETE FROM parents_tuteurs').run()
+    db.prepare('DELETE FROM paiements').run()
+    db.prepare('DELETE FROM inscriptions').run()
+    db.prepare('DELETE FROM eleves').run()
+
+    db.prepare('DELETE FROM affectations_enseignants').run()
+    db.prepare('DELETE FROM emplois_du_temps').run()
+    db.prepare('DELETE FROM presences_personnel').run()
+    db.prepare('DELETE FROM salaires_mensuels').run()
+    db.prepare('DELETE FROM personnel_annees').run()
+    db.prepare('DELETE FROM enseignants').run()
+
+    db.prepare('DELETE FROM depenses').run()
+    db.prepare('DELETE FROM frais_modeles').run()
+    db.prepare('DELETE FROM grille_tarifaire').run()
+    db.prepare('DELETE FROM echeancier_paiements').run()
+    db.prepare('DELETE FROM journal_activite').run()
+    db.prepare(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES ('demo_mode', '0', datetime('now'))
+       ON CONFLICT(key) DO UPDATE SET value = '0', updated_at = datetime('now')`
+    ).run()
+
+    logActivity(
+      userId ?? null,
+      'sortie_demo',
+      'application',
+      null,
+      `${deleted.eleves} élèves, ${deleted.paiements} paiements, ${deleted.personnel} personnels supprimés`
+    )
+  })
+
+  reset()
+  return { success: true, deleted }
 }

@@ -8,6 +8,7 @@ import * as scolariteService from '../services/scolarite'
 import * as documentsService from '../services/documents'
 import * as financesService from '../services/finances'
 import * as adminService from '../services/admin'
+import * as payrollService from '../services/payroll'
 import { handlePdfAction, handlePdfPrint } from '../services/pdf-handler'
 import { backupDatabase, restoreDatabase, getDbPath } from '../../../db/database'
 import { seedDemoData, seedReferenceData } from '../../../db/seed'
@@ -36,7 +37,11 @@ export function registerIpcHandlers(): void {
     }
     return { success: false }
   })
-  ipcMain.handle(IPC_CHANNELS.DB_RESTORE, async () => {
+  ipcMain.handle(IPC_CHANNELS.DB_RESTORE, async (_, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
     const result = await dialog.showOpenDialog({
       title: 'Restaurer une sauvegarde',
       filters: [{ name: 'SQLite', extensions: ['db'] }],
@@ -44,6 +49,7 @@ export function registerIpcHandlers(): void {
     })
     if (!result.canceled && result.filePaths[0]) {
       restoreDatabase(result.filePaths[0])
+      authService.clearSessions()
       return { success: true }
     }
     return { success: false }
@@ -58,13 +64,29 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ANNEE_GET_ACTIVE, () => referentielService.getActiveAnnee())
   ipcMain.handle(IPC_CHANNELS.ANNEE_CREATE, (_, data) => referentielService.createAnnee(data))
   ipcMain.handle(IPC_CHANNELS.ANNEE_SET_ACTIVE, (_, id) => referentielService.setActiveAnnee(id))
+  ipcMain.handle(IPC_CHANNELS.ANNEE_START, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return referentielService.startNewAnnee(data, session.utilisateur.id)
+  })
   ipcMain.handle(IPC_CHANNELS.CLASSE_LIST, (_, anneeId) =>
     referentielService.listClasses(anneeId)
   )
-  ipcMain.handle(IPC_CHANNELS.CLASSE_CREATE, (_, data) => referentielService.createClasse(data))
+  ipcMain.handle(IPC_CHANNELS.CLASSE_CREATE, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return referentielService.createClasse(data)
+  })
   ipcMain.handle(IPC_CHANNELS.CLASSE_UPDATE, (_, id, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return adminService.updateClasse(id, data, userId ?? undefined)
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return adminService.updateClasse(id, data, session.utilisateur.id)
   })
 
   // Élèves
@@ -115,7 +137,11 @@ export function registerIpcHandlers(): void {
   )
 
   // Seed
-  ipcMain.handle(IPC_CHANNELS.SEED_DEMO, () => {
+  ipcMain.handle(IPC_CHANNELS.SEED_DEMO, (_, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
     seedReferenceData()
     return seedDemoData()
   })
@@ -131,8 +157,11 @@ export function registerIpcHandlers(): void {
     scolariteService.getNotesGrid(classeId, periodeId)
   )
   ipcMain.handle(IPC_CHANNELS.NOTES_SAVE, (_, classeId, periodeId, matiereId, notes, token) => {
-    const userId = authService.getCurrentUserId(token)
-    scolariteService.saveNotes(classeId, periodeId, matiereId, notes, userId ?? undefined)
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et au secrétariat')
+    }
+    scolariteService.saveNotes(classeId, periodeId, matiereId, notes, session.utilisateur.id)
     return true
   })
   ipcMain.handle(IPC_CHANNELS.MOYENNES_CLASSE, (_, classeId, periodeId) =>
@@ -142,12 +171,15 @@ export function registerIpcHandlers(): void {
     scolariteService.getPalmares(classeId, periodeId)
   )
   ipcMain.handle(IPC_CHANNELS.BULLETIN_GENERER, (_, classeId, periodeId, appreciations, token) => {
-    const userId = authService.getCurrentUserId(token)
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'secretariat'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et au secrétariat')
+    }
     return scolariteService.genererBulletinsClasse(
       classeId,
       periodeId,
       appreciations,
-      userId ?? undefined
+      session.utilisateur.id
     )
   })
   ipcMain.handle(IPC_CHANNELS.BULLETIN_DATA, (_, eleveId, periodeId) =>
@@ -161,6 +193,15 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.BULLETIN_PDF, async (_, eleveId, periodeId, action = 'save') => {
     const data = scolariteService.getBulletinData(eleveId, periodeId)
     if (!data) return { success: false, error: 'Bulletin introuvable — saisissez les notes d\'abord' }
+    if (!data.bulletin) {
+      return { success: false, error: 'Générez le bulletin avant de l’imprimer' }
+    }
+    if (
+      Math.abs(data.bulletin.moyenne_generale - data.moyenne.moyenne) > 0.001 ||
+      data.bulletin.rang !== data.moyenne.rang
+    ) {
+      return { success: false, error: 'Les notes ont changé. Régénérez le bulletin avant impression.' }
+    }
     return handlePdfAction(
       { type: 'bulletin', data },
       action as 'save' | 'print',
@@ -218,18 +259,14 @@ export function registerIpcHandlers(): void {
         type.replace(/_/g, ' ')
       )
 
-      if (result.success) {
-        try {
-          documentsService.enregistrerDocumentOfficiel(
-            eleveId,
-            type,
-            result.path || type,
-            JSON.stringify(data),
-            userId ?? undefined
-          )
-        } catch (err) {
-          console.error('Enregistrement document officiel:', err)
-        }
+      if (result.success && result.path) {
+        documentsService.enregistrerDocumentOfficiel(
+          eleveId,
+          type,
+          result.path,
+          JSON.stringify(data),
+          userId ?? undefined
+        )
       }
 
       return result
@@ -261,15 +298,21 @@ export function registerIpcHandlers(): void {
     financesService.getSituationFinanciere(eleveId, anneeId)
   )
   ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE, (_, anneeId) =>
-    financesService.listGrilleTarifaire(anneeId)
+    financesService.listFraisConfigurations(anneeId)
   )
   ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE_UPSERT, (_, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return financesService.upsertTarif(data, userId ?? undefined)
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return financesService.upsertFraisConfiguration(data, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE_DELETE, (_, id, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return financesService.deleteTarif(id, userId ?? undefined)
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return financesService.deleteFraisConfiguration(id, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, (_, data, token) => {
     const userId = authService.getCurrentUserId(token)
@@ -285,8 +328,18 @@ export function registerIpcHandlers(): void {
     financesService.listDepenses(anneeId)
   )
   ipcMain.handle(IPC_CHANNELS.FINANCES_DEPENSE_CREATE, (_, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return financesService.createDepense(data, userId ?? undefined)
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'comptable'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et à la comptabilité')
+    }
+    return financesService.createDepense(data, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.FINANCES_BILAN_ANNUEL, (_, anneeId, token) => {
+    const session = authService.getSession(token)
+    if (!session || !['directrice', 'comptable'].includes(session.utilisateur.role)) {
+      throw new Error('Accès réservé à la direction et à la comptabilité')
+    }
+    return financesService.getBilanAnnuel(anneeId)
   })
   ipcMain.handle(IPC_CHANNELS.FINANCES_RECU_PDF, async (_, paiementId, action = 'save') => {
     const data = financesService.getRecuData(paiementId)
@@ -298,14 +351,51 @@ export function registerIpcHandlers(): void {
       'Reçu de paiement'
     )
   })
-  ipcMain.handle(IPC_CHANNELS.FINANCES_IMPAYES_PDF, async (_, anneeId, anneeLibelle, action = 'save', classeId) => {
-    const impayes = financesService.listImpayes(anneeId, classeId)
+  ipcMain.handle(IPC_CHANNELS.FINANCES_IMPAYES_PDF, async (_, anneeId, anneeLibelle, action = 'save') => {
+    const impayes = financesService.listImpayes(anneeId)
     return handlePdfAction(
       { type: 'liste_impayes', data: { anneeLibelle: anneeLibelle || '', impayes } },
       action as 'save' | 'print',
       anneeLibelle || 'impayes',
       'Liste des impayés'
     )
+  })
+
+  // --- Paie du personnel ---
+  ipcMain.handle(IPC_CHANNELS.PAIE_PERSONNEL_ANNEE, (_, anneeId, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.listPersonnelAnnee(anneeId)
+  })
+  ipcMain.handle(IPC_CHANNELS.PAIE_PERSONNEL_INITIALISER, (_, anneeId, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.initializePersonnelAnnee(anneeId, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.PAIE_SALAIRE_CONFIGURER, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.configureSalaire(data, session.utilisateur.id)
+  })
+  ipcMain.handle(IPC_CHANNELS.PAIE_MENSUELLE, (_, anneeId, month, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.getPaieMensuelle(anneeId, month)
+  })
+  ipcMain.handle(IPC_CHANNELS.PAIE_VALIDER, (_, data, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return payrollService.validateSalairePayment(data, session.utilisateur.id)
   })
 
   // --- Administratif ---
@@ -316,12 +406,18 @@ export function registerIpcHandlers(): void {
     adminService.listPersonnel(actifOnly)
   )
   ipcMain.handle(IPC_CHANNELS.ADMIN_PERSONNEL_CREATE, (_, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return adminService.createPersonnel(data, userId ?? undefined)
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return adminService.createPersonnel(data, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.ADMIN_PERSONNEL_UPDATE, (_, id, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return adminService.updatePersonnel(id, data, userId ?? undefined)
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return adminService.updatePersonnel(id, data, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.ADMIN_UTILISATEUR_LIST, (_, token) => {
     const session = authService.getSession(token)
@@ -360,4 +456,21 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ADMIN_JOURNAL_LIST, (_, filtres) =>
     adminService.listJournal(filtres)
   )
+  ipcMain.handle(IPC_CHANNELS.ADMIN_DEMO_STATUS, (_, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    return adminService.getDemoStatus()
+  })
+  ipcMain.handle(IPC_CHANNELS.ADMIN_DEMO_EXIT, (_, confirmation, token) => {
+    const session = authService.getSession(token)
+    if (!session || session.utilisateur.role !== 'directrice') {
+      throw new Error('Accès réservé à la directrice')
+    }
+    if (confirmation !== 'QUITTER DEMO') {
+      throw new Error('Confirmation incorrecte')
+    }
+    return adminService.exitDemoMode(session.utilisateur.id)
+  })
 }

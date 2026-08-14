@@ -1,5 +1,5 @@
 import * as financesService from '../services/finances'
-import { getDb } from '../../../db/database'
+import { getDb } from '@database'
 import type { DashboardStats, RechercheResultat } from '../../../shared/types'
 
 export function getDashboardStats(anneeScolaireId?: number): DashboardStats {
@@ -74,6 +74,18 @@ export function getDashboardStats(anneeScolaireId?: number): DashboardStats {
   }
 
   if (anneeId) {
+    const configuredFees = (
+      db
+        .prepare('SELECT COUNT(*) as count FROM frais_modeles WHERE annee_scolaire_id = ?')
+        .get(anneeId) as { count: number }
+    ).count
+    if (configuredFees === 0) {
+      alertes.push({
+        type: 'configuration',
+        message: "Les frais scolaires de l'année ne sont pas encore configurés",
+        count: 0
+      })
+    }
     try {
       const fd = financesService.getFinancesDashboard(anneeId)
       financesData = {

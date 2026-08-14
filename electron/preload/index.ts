@@ -37,8 +37,8 @@ const api = {
   // DB
   backupDb: (): Promise<{ success: boolean; path?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.DB_BACKUP),
-  restoreDb: (): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.DB_RESTORE),
+  restoreDb: (token: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DB_RESTORE, token),
   getDbPath: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.DB_GET_PATH),
 
   // Référentiel
@@ -58,15 +58,23 @@ const api = {
   }): Promise<AnneeScolaire> => ipcRenderer.invoke(IPC_CHANNELS.ANNEE_CREATE, data),
   setActiveAnnee: (id: number): Promise<AnneeScolaire> =>
     ipcRenderer.invoke(IPC_CHANNELS.ANNEE_SET_ACTIVE, id),
+  startNewAnnee: (
+    data: import('../../shared/types').NouvelleAnneeFormData,
+    token: string
+  ): Promise<import('../../shared/types').NouvelleAnneeResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ANNEE_START, data, token),
   listClasses: (anneeId?: number): Promise<Classe[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.CLASSE_LIST, anneeId),
-  createClasse: (data: {
-    annee_scolaire_id: number
-    niveau_id: number
-    section_id: number
-    nom: string
-    capacite_max?: number
-  }): Promise<Classe> => ipcRenderer.invoke(IPC_CHANNELS.CLASSE_CREATE, data),
+  createClasse: (
+    data: {
+      annee_scolaire_id: number
+      niveau_id: number
+      section_id: number
+      nom: string
+      capacite_max?: number
+    },
+    token: string
+  ): Promise<Classe> => ipcRenderer.invoke(IPC_CHANNELS.CLASSE_CREATE, data, token),
 
   // Élèves
   listEleves: (filtres?: EleveFiltres): Promise<Inscription[]> =>
@@ -106,8 +114,8 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.RECHERCHE_GLOBALE, term, anneeId),
 
   // Seed
-  seedDemo: (): Promise<{ message: string; count: number }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.SEED_DEMO),
+  seedDemo: (token: string): Promise<{ message: string; count: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SEED_DEMO, token),
 
   // Scolarité
   listMatieres: (sectionId: number): Promise<Matiere[]> =>
@@ -181,11 +189,14 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DASHBOARD, anneeId),
   getSituationFinanciere: (eleveId: number, anneeId: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_SITUATION, eleveId, anneeId),
-  listGrilleTarifaire: (anneeId: number) =>
+  listFraisConfigurations: (anneeId: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE, anneeId),
-  upsertTarif: (data: object, token: string) =>
+  upsertFraisConfiguration: (
+    data: import('../../shared/types').FraisConfigurationFormData,
+    token: string
+  ) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE_UPSERT, data, token),
-  deleteTarif: (id: number, token: string) =>
+  deleteFraisConfiguration: (id: number, token: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE_DELETE, id, token),
   createPaiement: (data: import('../../shared/types').PaiementFormData, token: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, data, token),
@@ -197,14 +208,40 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DEPENSE_LIST, anneeId),
   createDepense: (data: object, token: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DEPENSE_CREATE, data, token),
+  getBilanAnnuel: (
+    anneeId: number,
+    token: string
+  ): Promise<import('../../shared/types').BilanAnnuel> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_BILAN_ANNUEL, anneeId, token),
   exportRecuPdf: (paiementId: number, action?: 'save' | 'print') =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_RECU_PDF, paiementId, action ?? 'save'),
-  exportImpayesPdf: (
+  exportImpayesPdf: (anneeId: number, anneeLibelle: string, action?: 'save' | 'print') =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES_PDF, anneeId, anneeLibelle, action ?? 'save'),
+
+  // Paie du personnel
+  listPersonnelAnnee: (
     anneeId: number,
-    anneeLibelle: string,
-    action?: 'save' | 'print',
-    classeId?: number
-  ) => ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES_PDF, anneeId, anneeLibelle, action ?? 'save', classeId),
+    token: string
+  ): Promise<import('../../shared/types').PersonnelAnneeDetail[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_PERSONNEL_ANNEE, anneeId, token),
+  initializePersonnelAnnee: (anneeId: number, token: string): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_PERSONNEL_INITIALISER, anneeId, token),
+  configureSalaire: (
+    data: import('../../shared/types').SalairePersonnelFormData,
+    token: string
+  ): Promise<import('../../shared/types').PersonnelAnneeDetail> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_SALAIRE_CONFIGURER, data, token),
+  getPaieMensuelle: (
+    anneeId: number,
+    month: string,
+    token: string
+  ): Promise<import('../../shared/types').PaieMensuelle> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_MENSUELLE, anneeId, month, token),
+  validateSalairePayment: (
+    data: import('../../shared/types').ValidationSalaireData,
+    token: string
+  ): Promise<import('../../shared/types').PaieMensuelleRow> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PAIE_VALIDER, data, token),
 
   // Administratif
   getAdminDashboard: (anneeId?: number): Promise<import('../../shared/types').AdminDashboard> =>
@@ -228,7 +265,14 @@ const api = {
   listJournal: (filtres?: import('../../shared/types').JournalFiltres) =>
     ipcRenderer.invoke(IPC_CHANNELS.ADMIN_JOURNAL_LIST, filtres),
   updateClasse: (id: number, data: { nom?: string; capacite_max?: number }, token: string) =>
-    ipcRenderer.invoke(IPC_CHANNELS.CLASSE_UPDATE, id, data, token)
+    ipcRenderer.invoke(IPC_CHANNELS.CLASSE_UPDATE, id, data, token),
+  getDemoStatus: (token: string): Promise<import('../../shared/types').DemoStatus> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_DEMO_STATUS, token),
+  exitDemoMode: (
+    confirmation: string,
+    token: string
+  ): Promise<import('../../shared/types').DemoResetResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ADMIN_DEMO_EXIT, confirmation, token)
 }
 
 contextBridge.exposeInMainWorld('api', api)

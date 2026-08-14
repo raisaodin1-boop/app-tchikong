@@ -18,15 +18,17 @@ import PaiementPage from './pages/finances/PaiementPage'
 import HistoriquePage from './pages/finances/HistoriquePage'
 import ImpayesPage from './pages/finances/ImpayesPage'
 import DepensesPage from './pages/finances/DepensesPage'
-import TarifsPage from './pages/finances/TarifsPage'
+import BilanAnnuelPage from './pages/finances/BilanAnnuelPage'
 import AdminPage from './pages/admin/AdminPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import PersonnelPage from './pages/admin/PersonnelPage'
 import ClassesPage from './pages/admin/ClassesPage'
+import FraisScolairesPage from './pages/admin/FraisScolairesPage'
+import AnneesScolairesPage from './pages/admin/AnneesScolairesPage'
+import PaiePersonnelPage from './pages/admin/PaiePersonnelPage'
 import UtilisateursPage from './pages/admin/UtilisateursPage'
 import DocumentsPage from './pages/admin/DocumentsPage'
 import JournalPage from './pages/admin/JournalPage'
-import AnneesPage from './pages/admin/AnneesPage'
 import LoadingScreen from './components/ui/LoadingScreen'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -39,6 +41,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function RoleRoute({ access, children }: { access: NavKey; children: React.ReactNode }) {
   const { user } = useAuth()
   if (!canAccess(user?.role, access)) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+function DirectriceRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (user?.role !== 'directrice') return <Navigate to="/" replace />
   return <>{children}</>
 }
 
@@ -128,7 +137,7 @@ export default function App() {
           <Route path="historique" element={<HistoriquePage />} />
           <Route path="impayes" element={<ImpayesPage />} />
           <Route path="depenses" element={<DepensesPage />} />
-          <Route path="tarifs" element={<TarifsPage />} />
+          <Route path="bilan" element={<BilanAnnuelPage />} />
         </Route>
         <Route
           path="admin"
@@ -141,7 +150,30 @@ export default function App() {
           <Route index element={<AdminDashboardPage />} />
           <Route path="personnel" element={<PersonnelPage />} />
           <Route path="classes" element={<ClassesPage />} />
-          <Route path="annees" element={<AnneesPage />} />
+          <Route
+            path="frais"
+            element={
+              <DirectriceRoute>
+                <FraisScolairesPage />
+              </DirectriceRoute>
+            }
+          />
+          <Route
+            path="annees"
+            element={
+              <DirectriceRoute>
+                <AnneesScolairesPage />
+              </DirectriceRoute>
+            }
+          />
+          <Route
+            path="paie"
+            element={
+              <DirectriceRoute>
+                <PaiePersonnelPage />
+              </DirectriceRoute>
+            }
+          />
           <Route path="utilisateurs" element={<UtilisateursPage />} />
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="journal" element={<JournalPage />} />

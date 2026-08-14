@@ -5,6 +5,7 @@ import {
   StandardFonts,
   type RGB
 } from 'pdf-lib'
+import QRCode from 'qrcode'
 import { A4, MARGINS, SCHOOL, COLORS } from './config'
 import { todayFormatted } from './utils'
 
@@ -129,9 +130,9 @@ export class PdfBuilder {
     this.moveY(18)
 
     // Ministère
-    this.drawCentered('MINISTÈRE DES ENSEIGNEMENTS SECONDAIRES', cx, this.y, 8, true)
+    this.drawCentered('MINISTÈRE DE L’ÉDUCATION DE BASE', cx, this.y, 8, true)
     this.moveY(11)
-    this.drawCentered('DE L\'ÉDUCATION DE BASE ET DE LA FORMATION PROFESSIONNELLE', cx, this.y, 7)
+    this.drawCentered('DÉLÉGATION RÉGIONALE DU LITTORAL', cx, this.y, 7)
     this.moveY(16)
 
     // École — bloc central
@@ -149,7 +150,10 @@ export class PdfBuilder {
     this.drawCentered(SCHOOL.name, cx, this.y - 14, 11, true, COLORS.primary)
     this.drawCentered(SCHOOL.subtitle, cx, this.y - 28, 10, true, COLORS.primary)
     this.drawCentered(SCHOOL.address, cx, this.y - 40, 8, false, COLORS.textMuted)
-    this.drawCentered(`${SCHOOL.phone}  |  ${SCHOOL.email}`, cx, this.y - 50, 7, false, COLORS.textMuted)
+    const contacts = [SCHOOL.phone, SCHOOL.email].filter(Boolean).join('  |  ')
+    if (contacts) {
+      this.drawCentered(contacts, cx, this.y - 50, 7, false, COLORS.textMuted)
+    }
 
     this.y = boxY - 16
     return this
@@ -266,14 +270,15 @@ export class PdfBuilder {
         const cell = row.cells[c] || ''
         const font = row.bold ? this.fontBold : this.font
         const size = 8.5
-        const tw = font.widthOfTextAtSize(cell, size)
+        const fitted = fitTextToWidth(sanitizeText(cell), font, size, col.width - 8)
+        const tw = font.widthOfTextAtSize(fitted, size)
         const tx =
           col.align === 'center'
             ? x + (col.width - tw) / 2
             : col.align === 'right'
               ? x + col.width - tw - 4
               : x + 4
-        this.drawText(cell, tx, this.y - 10, size, row.bold || false)
+        this.drawText(fitted, tx, this.y - 10, size, row.bold || false)
         x += col.width
       }
 
@@ -324,6 +329,84 @@ export class PdfBuilder {
     })
 
     this.moveY(44)
+    return this
+  }
+
+  drawPerformanceBar(value: number, max = 20): this {
+    this.ensureSpace(44)
+    const normalized = Math.max(0, Math.min(max, value))
+    const ratio = max > 0 ? normalized / max : 0
+    const barX = MARGINS.left
+    const barWidth = this.contentWidth
+    this.drawText('INDICE DE PERFORMANCE', barX, this.y, 7, true, COLORS.textMuted)
+    this.moveY(12)
+    this.page.drawRectangle({
+      x: barX,
+      y: this.y - 8,
+      width: barWidth,
+      height: 10,
+      color: COLORS.borderLight
+    })
+    this.page.drawRectangle({
+      x: barX,
+      y: this.y - 8,
+      width: barWidth * ratio,
+      height: 10,
+      color: ratio >= 0.7 ? COLORS.success : ratio >= 0.5 ? COLORS.accent : COLORS.danger
+    })
+    this.drawText(`${normalized.toFixed(2)} / ${max}`, barX + barWidth - 48, this.y + 6, 7, true)
+    this.moveY(22)
+    return this
+  }
+
+  drawSectionTitle(title: string): this {
+    this.ensureSpace(28)
+    this.page.drawRectangle({
+      x: MARGINS.left,
+      y: this.y - 13,
+      width: 4,
+      height: 17,
+      color: COLORS.accent
+    })
+    this.drawText(title.toUpperCase(), MARGINS.left + 10, this.y - 7, 9, true, COLORS.primary)
+    this.moveY(24)
+    return this
+  }
+
+  async drawVerificationQr(payload: string, verificationCode: string): Promise<this> {
+    this.ensureSpace(76)
+    const dataUrl = await QRCode.toDataURL(payload, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 160,
+      color: { dark: '#12325B', light: '#FFFFFF' }
+    })
+    const base64 = dataUrl.split(',')[1]
+    const binary = atob(base64)
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
+    const image = await this.doc.embedPng(bytes)
+    const size = 58
+    const x = A4.width - MARGINS.right - size
+    const y = this.y - size + 5
+    this.page.drawImage(image, { x, y, width: size, height: size })
+    this.drawText('CONTRÔLE DU BULLETIN', MARGINS.left, this.y - 10, 8, true, COLORS.primary)
+    this.drawText(
+      `Référence de contrôle : ${verificationCode}`,
+      MARGINS.left,
+      this.y - 26,
+      8,
+      false,
+      COLORS.textMuted
+    )
+    this.drawText(
+      'Le QR code contient le matricule, la période et les résultats de contrôle.',
+      MARGINS.left,
+      this.y - 40,
+      7,
+      false,
+      COLORS.textMuted
+    )
+    this.moveY(70)
     return this
   }
 
@@ -488,4 +571,13 @@ function wrapParagraph(text: string, maxChars: number): string[] {
   }
   if (line) lines.push(line)
   return lines
+}
+
+function fitTextToWidth(text: string, font: PDFFont, size: number, maxWidth: number): string {
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text
+  let fitted = text
+  while (fitted.length > 1 && font.widthOfTextAtSize(`${fitted}...`, size) > maxWidth) {
+    fitted = fitted.slice(0, -1)
+  }
+  return `${fitted.trimEnd()}...`
 }

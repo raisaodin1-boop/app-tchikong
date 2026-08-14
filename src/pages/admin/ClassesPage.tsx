@@ -61,13 +61,17 @@ export default function ClassesPage() {
     setSaving(true)
     setError('')
     try {
-      await window.api.createClasse({
-        annee_scolaire_id: anneeActive.id,
-        section_id: createForm.section_id,
-        niveau_id: createForm.niveau_id,
-        nom: createForm.nom,
-        capacite_max: createForm.capacite_max
-      })
+      if (!token) return
+      await window.api.createClasse(
+        {
+          annee_scolaire_id: anneeActive.id,
+          section_id: createForm.section_id,
+          niveau_id: createForm.niveau_id,
+          nom: createForm.nom,
+          capacite_max: createForm.capacite_max
+        },
+        token
+      )
       setCreating(false)
       setCreateForm({ nom: '', section_id: 0, niveau_id: 0, capacite_max: 40 })
       await load()
