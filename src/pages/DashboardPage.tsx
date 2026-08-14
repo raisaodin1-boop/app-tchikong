@@ -10,6 +10,8 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { useApp } from '../contexts/AppContext'
+import { useAuth } from '../contexts/AuthContext'
+import { canAccess } from '../lib/roles'
 import type { DashboardStats } from '@shared/types'
 
 function StatCard({
@@ -43,6 +45,7 @@ function StatCard({
 
 export default function DashboardPage() {
   const { anneeActive } = useApp()
+  const { user } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [seeding, setSeeding] = useState(false)
 
@@ -172,14 +175,29 @@ export default function DashboardPage() {
                 Alertes
               </h2>
               <div className="space-y-2">
-                {stats.alertes.map((a, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700"
-                  >
-                    {a.message}
-                  </div>
-                ))}
+                {stats.alertes.map((a, i) => {
+                  const to =
+                    a.type === 'impaye'
+                      ? canAccess(user?.role, 'finances')
+                        ? '/finances/impayes'
+                        : '/'
+                      : a.type === 'surcharge'
+                        ? canAccess(user?.role, 'admin')
+                          ? '/admin/classes'
+                          : '/'
+                        : canAccess(user?.role, 'presence')
+                          ? '/presence'
+                          : '/'
+                  return (
+                    <Link
+                      key={i}
+                      to={to}
+                      className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100"
+                    >
+                      {a.message}
+                    </Link>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -189,22 +207,30 @@ export default function DashboardPage() {
       <div className="card p-5">
         <h2 className="text-lg font-semibold mb-4">Actions rapides</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Link to="/eleves/nouveau" className="btn-secondary flex-col py-4 h-auto">
-            <UserPlus className="h-5 w-5 text-tchikong-500" />
-            <span>Nouvel élève</span>
-          </Link>
-          <Link to="/finances" className="btn-secondary flex-col py-4 h-auto">
-            <CreditCard className="h-5 w-5 text-accent-green" />
-            <span>Enregistrer paiement</span>
-          </Link>
-          <Link to="/scolarite" className="btn-secondary flex-col py-4 h-auto">
-            <FileText className="h-5 w-5 text-blue-500" />
-            <span>Imprimer bulletin</span>
-          </Link>
-          <Link to="/eleves" className="btn-secondary flex-col py-4 h-auto">
-            <Users className="h-5 w-5 text-tchikong-500" />
-            <span>Liste des élèves</span>
-          </Link>
+          {canAccess(user?.role, 'eleves') && (
+            <Link to="/eleves/nouveau" className="btn-secondary flex-col py-4 h-auto">
+              <UserPlus className="h-5 w-5 text-tchikong-500" />
+              <span>Nouvel élève</span>
+            </Link>
+          )}
+          {canAccess(user?.role, 'finances') && (
+            <Link to="/finances/paiement" className="btn-secondary flex-col py-4 h-auto">
+              <CreditCard className="h-5 w-5 text-accent-green" />
+              <span>Enregistrer paiement</span>
+            </Link>
+          )}
+          {canAccess(user?.role, 'scolarite') && (
+            <Link to="/scolarite" className="btn-secondary flex-col py-4 h-auto">
+              <FileText className="h-5 w-5 text-blue-500" />
+              <span>Imprimer bulletin</span>
+            </Link>
+          )}
+          {canAccess(user?.role, 'eleves') && (
+            <Link to="/eleves" className="btn-secondary flex-col py-4 h-auto">
+              <Users className="h-5 w-5 text-tchikong-500" />
+              <span>Liste des élèves</span>
+            </Link>
+          )}
         </div>
       </div>
     </div>

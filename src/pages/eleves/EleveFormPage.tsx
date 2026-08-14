@@ -3,12 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
-import type { EleveFormData, LienParente, Sexe } from '@shared/types'
+import type { Eleve, EleveFormData, Inscription, LienParente, ParentTuteur, Sexe, StatutEleve } from '@shared/types'
 
 const emptyParent = {
   nom: '',
   prenom: '',
   telephone: '',
+  telephone_secondaire: '',
   profession: '',
   lien_parente: 'pere' as LienParente,
   contact_urgence: false,
@@ -34,12 +35,17 @@ export default function EleveFormPage() {
     classe_id: 0,
     niveau_id: 0,
     redoublement: false,
+    statut: 'actif' as StatutEleve,
     parents: [{ ...emptyParent }]
   })
 
   useEffect(() => {
     if (isEdit && id) {
-      window.api.getEleve(Number(id), anneeActive?.id).then((data) => {
+      window.api.getEleve(Number(id), anneeActive?.id).then((data: {
+        eleve: Eleve
+        inscription: Inscription | null
+        parents: ParentTuteur[]
+      } | null) => {
         if (data) {
           setForm({
             nom: data.eleve.nom,
@@ -51,15 +57,17 @@ export default function EleveFormPage() {
             classe_id: data.inscription?.classe_id || 0,
             niveau_id: data.inscription?.niveau_id || 0,
             redoublement: Boolean(data.inscription?.redoublement),
+            statut: data.eleve.statut || 'actif',
             parents:
               data.parents.length > 0
-                ? data.parents.map((p) => ({
+                ? data.parents.map((p: ParentTuteur) => ({
                     nom: p.nom,
                     prenom: p.prenom || '',
                     telephone: p.telephone,
+                    telephone_secondaire: p.telephone_secondaire || '',
                     profession: p.profession || '',
                     lien_parente: p.lien_parente,
-                    contact_urgence: p.contact_urgence,
+                    contact_urgence: Boolean(p.contact_urgence),
                     email: p.email || ''
                   }))
                 : [{ ...emptyParent }]
@@ -93,6 +101,17 @@ export default function EleveFormPage() {
       return
     }
 
+    const classe = classes.find((c) => c.id === form.classe_id)
+    if (classe && (classe.effectif ?? 0) >= classe.capacite_max && !isEdit) {
+      if (
+        !confirm(
+          `La classe ${classe.nom} est pleine (${classe.effectif}/${classe.capacite_max}). Inscrire quand même ?`
+        )
+      ) {
+        return
+      }
+    }
+
     setLoading(true)
     setError('')
 
@@ -107,12 +126,14 @@ export default function EleveFormPage() {
       section_id: form.section_id,
       niveau_id: form.niveau_id,
       redoublement: form.redoublement,
+      statut: form.statut,
       parents: form.parents
         .filter((p) => p.nom && p.telephone)
         .map((p) => ({
           nom: p.nom,
           prenom: p.prenom || null,
           telephone: p.telephone,
+          telephone_secondaire: p.telephone_secondaire || null,
           profession: p.profession || null,
           lien_parente: p.lien_parente,
           contact_urgence: p.contact_urgence,
@@ -261,6 +282,21 @@ export default function EleveFormPage() {
                 ))}
               </select>
             </div>
+            {isEdit && (
+              <div>
+                <label className="label">Statut</label>
+                <select
+                  className="input"
+                  value={form.statut}
+                  onChange={(e) => setForm({ ...form, statut: e.target.value as StatutEleve })}
+                >
+                  <option value="actif">Actif</option>
+                  <option value="transfere">Transféré</option>
+                  <option value="exclu">Exclu</option>
+                  <option value="diplome">Diplômé</option>
+                </select>
+              </div>
+            )}
             <div className="flex items-end">
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -333,6 +369,14 @@ export default function EleveFormPage() {
                     className="input"
                     value={parent.telephone}
                     onChange={(e) => updateParent(index, 'telephone', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">Téléphone secondaire</label>
+                  <input
+                    className="input"
+                    value={parent.telephone_secondaire}
+                    onChange={(e) => updateParent(index, 'telephone_secondaire', e.target.value)}
                   />
                 </div>
                 <div>

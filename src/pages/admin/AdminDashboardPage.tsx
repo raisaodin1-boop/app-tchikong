@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Users, UserCog, GraduationCap, FileText, AlertTriangle, ArrowRight } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
+import { formatDateTimeFr } from '../../lib/dates'
 import type { AdminDashboard } from '@shared/types'
 
 function StatCard({
@@ -124,7 +125,7 @@ export default function AdminDashboardPage() {
                     {a.details && <span className="text-gray-500 font-normal"> ({a.details})</span>}
                   </p>
                   <p className="text-xs text-gray-400">
-                    {a.utilisateur_nom || 'Système'} · {new Date(a.created_at).toLocaleString('fr-FR')}
+                    {a.utilisateur_nom || 'Système'} · {formatDateTimeFr(a.created_at)}
                   </p>
                 </div>
               </div>

@@ -145,13 +145,22 @@ export function saveNotes(
 
   const transaction = db.transaction(() => {
     for (const n of notes) {
-      if (n.valeur === null || n.valeur === undefined || isNaN(n.valeur)) continue
+      const noteSur = n.note_sur ?? 20
+      if (n.valeur === null || n.valeur === undefined || Number.isNaN(n.valeur)) {
+        db.prepare(
+          'DELETE FROM notes WHERE eleve_id = ? AND matiere_id = ? AND periode_id = ?'
+        ).run(n.eleve_id, matiereId, periodeId)
+        continue
+      }
+      if (n.valeur < 0 || n.valeur > noteSur) {
+        throw new Error(`Note invalide pour l'élève ${n.eleve_id} : ${n.valeur}/${noteSur}`)
+      }
       upsert.run(
         n.eleve_id,
         matiereId,
         periodeId,
         n.valeur,
-        n.note_sur ?? 20,
+        noteSur,
         matiere?.coefficient ?? 1,
         n.appreciation ?? null
       )
@@ -176,7 +185,6 @@ export function calculerMention(moyenne: number): MentionBulletin {
 }
 
 export function calculerMoyennesClasse(classeId: number, periodeId: number): EleveMoyenne[] {
-  const db = getDb()
   const grid = getNotesGrid(classeId, periodeId)
   if (!grid) return []
 
@@ -306,6 +314,12 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
 
   if (!eleve) return null
 
+  const periode = db
+    .prepare('SELECT * FROM periodes_evaluation WHERE id = ?')
+    .get(periodeId) as PeriodeEvaluation | undefined
+
+  if (!periode) return null
+
   const inscription = db
     .prepare(
       `SELECT c.nom as classe_nom, s.code as section_code, n.nom as niveau_nom, i.classe_id, a.libelle as annee_libelle
@@ -314,9 +328,10 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
        JOIN sections s ON s.id = i.section_id
        JOIN niveaux n ON n.id = i.niveau_id
        JOIN annees_scolaires a ON a.id = i.annee_scolaire_id
-       WHERE i.eleve_id = ? ORDER BY i.date_inscription DESC LIMIT 1`
+       WHERE i.eleve_id = ? AND i.annee_scolaire_id = ?
+       LIMIT 1`
     )
-    .get(eleveId) as {
+    .get(eleveId, periode.annee_scolaire_id) as {
     classe_nom: string
     section_code: string
     niveau_nom: string
@@ -325,12 +340,6 @@ export function getBulletinData(eleveId: number, periodeId: number): BulletinDat
   } | undefined
 
   if (!inscription) return null
-
-  const periode = db
-    .prepare('SELECT * FROM periodes_evaluation WHERE id = ?')
-    .get(periodeId) as PeriodeEvaluation | undefined
-
-  if (!periode) return null
 
   const moyennes = calculerMoyennesClasse(inscription.classe_id, periodeId)
   const moyenne = moyennes.find((m) => m.eleve_id === eleveId)

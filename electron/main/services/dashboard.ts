@@ -109,6 +109,25 @@ export function getDashboardStats(anneeScolaireId?: number): DashboardStats {
         count: surchargees.length
       })
     }
+
+    const today = new Date()
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const absences = (
+      db
+        .prepare(
+          `SELECT COUNT(*) as c FROM presences_eleves p
+           JOIN inscriptions i ON i.eleve_id = p.eleve_id AND i.annee_scolaire_id = ?
+           WHERE p.date = ? AND p.present = 0 AND i.statut = 'actif'`
+        )
+        .get(anneeId, todayIso) as { c: number }
+    ).c
+    if (absences > 0) {
+      alertes.push({
+        type: 'absence',
+        message: `${absences} absence(s) enregistrée(s) aujourd'hui`,
+        count: absences
+      })
+    }
   }
 
   return {

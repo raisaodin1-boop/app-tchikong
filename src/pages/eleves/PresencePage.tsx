@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
-import type { Inscription, MotifAbsence } from '@shared/types'
+import type { Inscription, MotifAbsence, PresenceEleve } from '@shared/types'
 import { Save, Check, X } from 'lucide-react'
 
 const motifOptions: { value: MotifAbsence; label: string }[] = [
@@ -47,7 +47,7 @@ export default function PresencePage() {
 
       const map: Record<number, { present: boolean; motif?: MotifAbsence; notes?: string }> = {}
       for (const e of elevesList) {
-        const existing = existingPresences.find((p) => p.eleve_id === e.eleve_id)
+        const existing = existingPresences.find((p: PresenceEleve) => p.eleve_id === e.eleve_id)
         map[e.eleve_id] = {
           present: existing ? Boolean(existing.present) : true,
           motif: existing?.motif_absence ?? undefined,

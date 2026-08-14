@@ -11,7 +11,7 @@ import { templateRecuPaiement, templateListeImpayes } from './templates/recu'
 import type { BulletinData } from '../scolarite'
 import type { AttestationData } from '../documents'
 import type { EleveMoyenne } from '../scolarite'
-import type { PeriodeEvaluation } from '../../../shared/types'
+import type { PeriodeEvaluation } from '../../../../shared/types'
 import type { ListeClasseData } from './templates/liste-classe'
 import type { RecuData } from '../finances'
 

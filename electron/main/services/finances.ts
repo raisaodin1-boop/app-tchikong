@@ -108,9 +108,15 @@ export { TYPE_FRAIS_LABELS, MODE_PAIEMENT_LABELS }
 
 function generateNumeroRecu(): string {
   const year = new Date().getFullYear()
-  const count =
-    (getDb().prepare('SELECT COUNT(*) as c FROM paiements').get() as { c: number }).c + 1
-  return `REC-${year}-${String(count).padStart(5, '0')}`
+  const prefix = `REC-${year}-`
+  const row = getDb()
+    .prepare(
+      `SELECT MAX(CAST(substr(numero_recu, length(?) + 1) AS INTEGER)) as n
+       FROM paiements WHERE numero_recu LIKE ?`
+    )
+    .get(prefix, `${prefix}%`) as { n: number | null }
+  const next = (row.n || 0) + 1
+  return `${prefix}${String(next).padStart(5, '0')}`
 }
 
 export function listGrilleTarifaire(anneeScolaireId: number): GrilleTarifaire[] {
@@ -212,7 +218,17 @@ export function getSituationFinanciere(
 }
 
 export function createPaiement(data: PaiementFormData, userId?: number): Paiement {
+  if (!data.montant || data.montant <= 0) {
+    throw new Error('Le montant du paiement doit être supérieur à 0')
+  }
+  if (!Number.isFinite(data.montant)) {
+    throw new Error('Montant invalide')
+  }
+
   const db = getDb()
+  const eleve = db.prepare('SELECT id FROM eleves WHERE id = ?').get(data.eleve_id)
+  if (!eleve) throw new Error('Élève introuvable')
+
   const numeroRecu = generateNumeroRecu()
 
   const result = db
@@ -517,6 +533,12 @@ export function createDepense(
   },
   userId?: number
 ): Depense {
+  if (!data.montant || data.montant <= 0) {
+    throw new Error('Le montant de la dépense doit être supérieur à 0')
+  }
+  if (!data.libelle?.trim()) {
+    throw new Error('Le libellé est requis')
+  }
   const result = getDb()
     .prepare(
       `INSERT INTO depenses (annee_scolaire_id, type, libelle, montant, date_depense, beneficiaire, notes, created_by)
@@ -537,4 +559,55 @@ export function createDepense(
   return getDb()
     .prepare('SELECT * FROM depenses WHERE id = ?')
     .get(result.lastInsertRowid) as Depense
+}
+
+export function upsertTarif(
+  data: {
+    annee_scolaire_id: number
+    niveau_id: number
+    section_id: number
+    type_frais: TypeFrais
+    libelle: string
+    montant: number
+  },
+  userId?: number
+): GrilleTarifaire {
+  if (!data.montant || data.montant < 0) {
+    throw new Error('Le montant du tarif doit être positif')
+  }
+  const db = getDb()
+  db.prepare(
+    `INSERT INTO grille_tarifaire (annee_scolaire_id, niveau_id, section_id, type_frais, libelle, montant)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(annee_scolaire_id, niveau_id, section_id, type_frais) DO UPDATE SET
+       libelle = excluded.libelle,
+       montant = excluded.montant`
+  ).run(
+    data.annee_scolaire_id,
+    data.niveau_id,
+    data.section_id,
+    data.type_frais,
+    data.libelle,
+    data.montant
+  )
+
+  logActivity(userId ?? null, 'modification', 'tarif', data.niveau_id, data.type_frais)
+
+  return db
+    .prepare(
+      `SELECT g.*, n.nom as niveau_nom, s.code as section_code
+       FROM grille_tarifaire g
+       JOIN niveaux n ON n.id = g.niveau_id
+       JOIN sections s ON s.id = g.section_id
+       WHERE g.annee_scolaire_id = ? AND g.niveau_id = ? AND g.section_id = ? AND g.type_frais = ?`
+    )
+    .get(data.annee_scolaire_id, data.niveau_id, data.section_id, data.type_frais) as GrilleTarifaire
+}
+
+export function deleteTarif(id: number, userId?: number): boolean {
+  const result = getDb().prepare('DELETE FROM grille_tarifaire WHERE id = ?').run(id)
+  if (result.changes > 0) {
+    logActivity(userId ?? null, 'suppression', 'tarif', id)
+  }
+  return result.changes > 0
 }

@@ -48,8 +48,25 @@ const api = {
   listAnnees: (): Promise<AnneeScolaire[]> => ipcRenderer.invoke(IPC_CHANNELS.ANNEE_LIST),
   getActiveAnnee: (): Promise<AnneeScolaire | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.ANNEE_GET_ACTIVE),
+  createAnnee: (data: {
+    libelle: string
+    date_debut: string
+    date_fin: string
+    nb_sequences?: number
+    nb_trimestres?: number
+    activer?: boolean
+  }): Promise<AnneeScolaire> => ipcRenderer.invoke(IPC_CHANNELS.ANNEE_CREATE, data),
+  setActiveAnnee: (id: number): Promise<AnneeScolaire> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ANNEE_SET_ACTIVE, id),
   listClasses: (anneeId?: number): Promise<Classe[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.CLASSE_LIST, anneeId),
+  createClasse: (data: {
+    annee_scolaire_id: number
+    niveau_id: number
+    section_id: number
+    nom: string
+    capacite_max?: number
+  }): Promise<Classe> => ipcRenderer.invoke(IPC_CHANNELS.CLASSE_CREATE, data),
 
   // Élèves
   listEleves: (filtres?: EleveFiltres): Promise<Inscription[]> =>
@@ -62,6 +79,13 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.ELEVE_UPDATE, id, data, token),
   searchEleves: (term: string, anneeId?: number): Promise<Inscription[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.ELEVE_SEARCH, term, anneeId),
+  changeStatutEleve: (
+    id: number,
+    statut: import('../../shared/types').StatutEleve,
+    anneeId: number | undefined,
+    description: string | undefined,
+    token: string
+  ) => ipcRenderer.invoke(IPC_CHANNELS.ELEVE_CHANGE_STATUT, id, statut, anneeId, description, token),
 
   // Présence
   getPresences: (classeId: number, date: string): Promise<PresenceEleve[]> =>
@@ -159,6 +183,10 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_SITUATION, eleveId, anneeId),
   listGrilleTarifaire: (anneeId: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE, anneeId),
+  upsertTarif: (data: object, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE_UPSERT, data, token),
+  deleteTarif: (id: number, token: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_GRILLE_DELETE, id, token),
   createPaiement: (data: import('../../shared/types').PaiementFormData, token: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, data, token),
   listPaiements: (filtres?: import('../../shared/types').PaiementFiltres) =>
@@ -171,8 +199,12 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_DEPENSE_CREATE, data, token),
   exportRecuPdf: (paiementId: number, action?: 'save' | 'print') =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_RECU_PDF, paiementId, action ?? 'save'),
-  exportImpayesPdf: (anneeId: number, anneeLibelle: string, action?: 'save' | 'print') =>
-    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES_PDF, anneeId, anneeLibelle, action ?? 'save'),
+  exportImpayesPdf: (
+    anneeId: number,
+    anneeLibelle: string,
+    action?: 'save' | 'print',
+    classeId?: number
+  ) => ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES_PDF, anneeId, anneeLibelle, action ?? 'save', classeId),
 
   // Administratif
   getAdminDashboard: (anneeId?: number): Promise<import('../../shared/types').AdminDashboard> =>

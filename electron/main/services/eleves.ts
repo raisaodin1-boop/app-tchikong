@@ -12,8 +12,15 @@ import type {
 
 function generateMatricule(): string {
   const year = new Date().getFullYear()
-  const count = (getDb().prepare('SELECT COUNT(*) as c FROM eleves').get() as { c: number }).c + 1
-  return `TCH-${year}-${String(count).padStart(4, '0')}`
+  const prefix = `TCH-${year}-`
+  const row = getDb()
+    .prepare(
+      `SELECT MAX(CAST(substr(matricule, length(?) + 1) AS INTEGER)) as n
+       FROM eleves WHERE matricule LIKE ?`
+    )
+    .get(prefix, `${prefix}%`) as { n: number | null }
+  const next = (row.n || 0) + 1
+  return `${prefix}${String(next).padStart(4, '0')}`
 }
 
 export function listEleves(filtres: EleveFiltres = {}): Inscription[] {
@@ -138,8 +145,8 @@ export function createEleve(data: EleveFormData, userId?: number): Eleve {
 
     if (data.parents) {
       const insertParent = db.prepare(
-        `INSERT INTO parents_tuteurs (eleve_id, nom, prenom, telephone, profession, lien_parente, contact_urgence, email)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO parents_tuteurs (eleve_id, nom, prenom, telephone, telephone_secondaire, profession, lien_parente, contact_urgence, email)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       for (const p of data.parents) {
         insertParent.run(
@@ -147,6 +154,7 @@ export function createEleve(data: EleveFormData, userId?: number): Eleve {
           p.nom,
           p.prenom ?? null,
           p.telephone,
+          p.telephone_secondaire ?? null,
           p.profession ?? null,
           p.lien_parente,
           p.contact_urgence ? 1 : 0,
@@ -187,24 +195,44 @@ export function updateEleve(
     }
 
     if (data.classe_id && data.annee_scolaire_id) {
-      db.prepare(
-        `UPDATE inscriptions SET classe_id = ?, section_id = ?, niveau_id = ?, redoublement = ?
-         WHERE eleve_id = ? AND annee_scolaire_id = ?`
-      ).run(
-        data.classe_id,
-        data.section_id,
-        data.niveau_id,
-        data.redoublement ? 1 : 0,
-        id,
-        data.annee_scolaire_id
-      )
+      const existing = db
+        .prepare('SELECT id FROM inscriptions WHERE eleve_id = ? AND annee_scolaire_id = ?')
+        .get(id, data.annee_scolaire_id) as { id: number } | undefined
+
+      if (existing) {
+        db.prepare(
+          `UPDATE inscriptions SET classe_id = ?, section_id = ?, niveau_id = ?, redoublement = ?, statut = ?
+           WHERE eleve_id = ? AND annee_scolaire_id = ?`
+        ).run(
+          data.classe_id,
+          data.section_id,
+          data.niveau_id,
+          data.redoublement ? 1 : 0,
+          data.statut ?? 'actif',
+          id,
+          data.annee_scolaire_id
+        )
+      } else {
+        db.prepare(
+          `INSERT INTO inscriptions (eleve_id, annee_scolaire_id, classe_id, section_id, niveau_id, redoublement, statut)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          id,
+          data.annee_scolaire_id,
+          data.classe_id,
+          data.section_id,
+          data.niveau_id,
+          data.redoublement ? 1 : 0,
+          data.statut ?? 'actif'
+        )
+      }
     }
 
     if (data.parents) {
       db.prepare('DELETE FROM parents_tuteurs WHERE eleve_id = ?').run(id)
       const insertParent = db.prepare(
-        `INSERT INTO parents_tuteurs (eleve_id, nom, prenom, telephone, profession, lien_parente, contact_urgence, email)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO parents_tuteurs (eleve_id, nom, prenom, telephone, telephone_secondaire, profession, lien_parente, contact_urgence, email)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       for (const p of data.parents) {
         insertParent.run(
@@ -212,6 +240,7 @@ export function updateEleve(
           p.nom,
           p.prenom ?? null,
           p.telephone,
+          p.telephone_secondaire ?? null,
           p.profession ?? null,
           p.lien_parente,
           p.contact_urgence ? 1 : 0,
@@ -277,6 +306,54 @@ export function addHistorique(
   return getDb()
     .prepare('SELECT * FROM historique_eleves WHERE id = ?')
     .get(result.lastInsertRowid) as HistoriqueEleve
+}
+
+export function changeStatutEleve(
+  id: number,
+  statut: Eleve['statut'],
+  anneeScolaireId: number | undefined,
+  description: string | undefined,
+  userId?: number
+): Eleve {
+  const db = getDb()
+  const current = db.prepare('SELECT * FROM eleves WHERE id = ?').get(id) as Eleve | undefined
+  if (!current) throw new Error('Élève introuvable')
+
+  const transaction = db.transaction(() => {
+    db.prepare(
+      `UPDATE eleves SET statut = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(statut, id)
+
+    if (anneeScolaireId) {
+      db.prepare(
+        `UPDATE inscriptions SET statut = ? WHERE eleve_id = ? AND annee_scolaire_id = ?`
+      ).run(statut, id, anneeScolaireId)
+    } else {
+      db.prepare(`UPDATE inscriptions SET statut = ? WHERE eleve_id = ?`).run(statut, id)
+    }
+
+    const typeMap: Record<string, HistoriqueEleve['type']> = {
+      transfere: 'transfert_sortant',
+      exclu: 'evolution_comportement',
+      diplome: 'changement_classe',
+      actif: 'changement_classe'
+    }
+
+    db.prepare(
+      `INSERT INTO historique_eleves (eleve_id, annee_scolaire_id, type, description, date_evenement)
+       VALUES (?, ?, ?, ?, date('now'))`
+    ).run(
+      id,
+      anneeScolaireId ?? null,
+      typeMap[statut] ?? 'evolution_comportement',
+      description || `Statut modifié : ${current.statut} → ${statut}`
+    )
+
+    logActivity(userId ?? null, 'modification', 'eleve', id, `statut=${statut}`)
+    return db.prepare('SELECT * FROM eleves WHERE id = ?').get(id) as Eleve
+  })
+
+  return transaction()
 }
 
 export function searchEleves(term: string, anneeScolaireId?: number): Inscription[] {

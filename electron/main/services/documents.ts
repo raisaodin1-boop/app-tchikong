@@ -1,3 +1,4 @@
+import { basename } from 'path'
 import { getDb, logActivity } from '../../../db/database'
 import type { TypeDocumentOfficiel } from '../../../shared/types'
 
@@ -135,10 +136,21 @@ export function getListeClasseData(classeId: number): {
 export function enregistrerDocumentOfficiel(
   eleveId: number,
   type: TypeDocumentOfficiel,
-  numero: string,
+  numeroOuChemin: string,
   contenuJson: string,
   userId?: number
 ): void {
+  const year = new Date().getFullYear()
+  const prefix = `DOC-${year}-`
+  const row = getDb()
+    .prepare(
+      `SELECT MAX(CAST(substr(numero, length(?) + 1) AS INTEGER)) as n
+       FROM documents_officiels WHERE numero LIKE ?`
+    )
+    .get(prefix, `${prefix}%`) as { n: number | null }
+  const numero = `${prefix}${String((row.n || 0) + 1).padStart(5, '0')}`
+  const fichier = basename(numeroOuChemin || '') || numero
+
   getDb()
     .prepare(
       `INSERT INTO documents_officiels (eleve_id, type, contenu_json, numero, generated_by)
@@ -146,5 +158,5 @@ export function enregistrerDocumentOfficiel(
     )
     .run(eleveId, type, contenuJson, numero, userId ?? null)
 
-  logActivity(userId ?? null, 'generation', 'document_officiel', eleveId, type)
+  logActivity(userId ?? null, 'generation', 'document_officiel', eleveId, `${type} ${fichier}`)
 }

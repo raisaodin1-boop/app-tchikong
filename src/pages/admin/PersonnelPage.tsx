@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { formatDateFr } from '../../lib/dates'
 import type { Enseignant, PersonnelFormData, PostePersonnel, Sexe } from '@shared/types'
 
 const POSTE_OPTIONS: { value: PostePersonnel; label: string }[] = [
@@ -175,7 +176,7 @@ export default function PersonnelPage() {
                   <td><span className="badge-gray capitalize">{p.poste}</span></td>
                   <td className="text-gray-500">{p.telephone || '—'}</td>
                   <td className="text-gray-500">
-                    {p.date_embauche ? new Date(p.date_embauche).toLocaleDateString('fr-FR') : '—'}
+                    {p.date_embauche ? formatDateFr(p.date_embauche) : '—'}
                   </td>
                   <td>
                     <span className={p.actif ? 'badge-green' : 'badge-red'}>
