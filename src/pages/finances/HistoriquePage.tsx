@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Search, Printer, FileDown } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
+import { formatDateFr } from '../../lib/dates'
 import type { Paiement, TypeFrais } from '@shared/types'
 
 function formatMoney(n: number) {
@@ -87,7 +88,7 @@ export default function HistoriquePage() {
             ) : (
               paiements.map((p) => (
                 <tr key={p.id}>
-                  <td>{new Date(p.date_paiement).toLocaleDateString('fr-FR')}</td>
+                  <td>{formatDateFr(p.date_paiement)}</td>
                   <td className="font-mono text-xs">{p.numero_recu}</td>
                   <td className="font-medium">{p.nom} {p.prenom}</td>
                   <td>{p.classe_nom}</td>

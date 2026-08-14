@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
+import { formatDateTimeFr } from '../../lib/dates'
 import type { DocumentOfficielDetail, TypeDocumentOfficiel } from '@shared/types'
 
 const TYPE_LABELS: Record<TypeDocumentOfficiel, string> = {
@@ -77,7 +78,7 @@ export default function DocumentsPage() {
                   <td className="font-mono text-xs text-gray-500">{d.eleve_matricule}</td>
                   <td className="text-gray-500">{d.generateur_nom || '—'}</td>
                   <td className="text-gray-500 text-sm">
-                    {new Date(d.generated_at).toLocaleString('fr-FR')}
+                    {formatDateTimeFr(d.generated_at)}
                   </td>
                 </tr>
               ))

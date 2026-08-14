@@ -1,9 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Phone, MapPin, Calendar, User, FileText, Printer } from 'lucide-react'
+import { ArrowLeft, Edit, Phone, MapPin, Calendar, User, FileText, Printer, Wallet } from 'lucide-react'
 import { useApp } from '../../contexts/AppContext'
 import { useAuth } from '../../contexts/AuthContext'
-import type { Eleve, Inscription, ParentTuteur, HistoriqueEleve } from '@shared/types'
+import { formatDateFr } from '../../lib/dates'
+import { formatMoney } from '../../lib/money'
+import { canAccess } from '../../lib/roles'
+import type {
+  Eleve,
+  Inscription,
+  ParentTuteur,
+  HistoriqueEleve,
+  SituationFinanciere,
+  StatutEleve
+} from '@shared/types'
 
 const lienLabels: Record<string, string> = {
   pere: 'Père',
@@ -21,17 +31,33 @@ const historiqueLabels: Record<string, string> = {
   evolution_comportement: 'Évolution comportement'
 }
 
+const statutLabels: Record<StatutEleve, string> = {
+  actif: 'Actif',
+  transfere: 'Transféré',
+  exclu: 'Exclu',
+  diplome: 'Diplômé'
+}
+
+const statutBadges: Record<StatutEleve, string> = {
+  actif: 'badge-green',
+  transfere: 'badge-blue',
+  exclu: 'badge-red',
+  diplome: 'badge-yellow'
+}
+
 export default function EleveDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { anneeActive } = useApp()
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const navigate = useNavigate()
   const [eleve, setEleve] = useState<Eleve | null>(null)
   const [inscription, setInscription] = useState<Inscription | null>(null)
   const [parents, setParents] = useState<ParentTuteur[]>([])
   const [historique, setHistorique] = useState<HistoriqueEleve[]>([])
+  const [situation, setSituation] = useState<SituationFinanciere | null>(null)
   const [loading, setLoading] = useState(true)
   const [docLoading, setDocLoading] = useState<string | null>(null)
+  const [statutSaving, setStatutSaving] = useState(false)
 
   const genererDocument = async (
     type: 'attestation_scolarite' | 'certificat_frequentation' | 'attestation_reussite',
@@ -56,7 +82,12 @@ export default function EleveDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    window.api.getEleve(Number(id), anneeActive?.id).then((data) => {
+      window.api.getEleve(Number(id), anneeActive?.id).then((data: {
+        eleve: Eleve
+        inscription: Inscription | null
+        parents: ParentTuteur[]
+        historique: HistoriqueEleve[]
+      } | null) => {
       if (data) {
         setEleve(data.eleve)
         setInscription(data.inscription)
@@ -65,7 +96,36 @@ export default function EleveDetailPage() {
       }
       setLoading(false)
     })
+    if (anneeActive) {
+      window.api.getSituationFinanciere(Number(id), anneeActive.id).then(setSituation)
+    }
   }, [id, anneeActive?.id])
+
+  const handleStatut = async (statut: StatutEleve) => {
+    if (!id || !token || !eleve || statut === eleve.statut) return
+    const label = statutLabels[statut]
+    if (!confirm(`Passer ${eleve.prenom} ${eleve.nom} au statut « ${label} » ?`)) return
+    setStatutSaving(true)
+    try {
+      const updated = await window.api.changeStatutEleve(
+        Number(id),
+        statut,
+        anneeActive?.id,
+        `Statut : ${statutLabels[eleve.statut]} → ${label}`,
+        token
+      )
+      setEleve(updated)
+      const data = await window.api.getEleve(Number(id), anneeActive?.id)
+      if (data) {
+        setInscription(data.inscription)
+        setHistorique(data.historique)
+      }
+    } catch (err) {
+      alert((err as Error).message)
+    } finally {
+      setStatutSaving(false)
+    }
+  }
 
   if (loading) {
     return <div className="text-center py-12 text-gray-400">Chargement...</div>
@@ -112,7 +172,7 @@ export default function EleveDetailPage() {
                 <dt className="text-gray-500">Date de naissance</dt>
                 <dd className="font-medium flex items-center gap-1 mt-0.5">
                   <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                  {new Date(eleve.date_naissance).toLocaleDateString('fr-FR')}
+                  {formatDateFr(eleve.date_naissance)}
                 </dd>
               </div>
               <div>
@@ -131,7 +191,7 @@ export default function EleveDetailPage() {
               <div>
                 <dt className="text-gray-500">Statut</dt>
                 <dd className="mt-0.5">
-                  <span className="badge-green">{eleve.statut}</span>
+                  <span className={statutBadges[eleve.statut]}>{statutLabels[eleve.statut]}</span>
                 </dd>
               </div>
             </dl>
@@ -208,7 +268,7 @@ export default function EleveDetailPage() {
                 {historique.map((h) => (
                   <div key={h.id} className="flex gap-3 text-sm">
                     <div className="w-24 flex-shrink-0 text-gray-400">
-                      {new Date(h.date_evenement).toLocaleDateString('fr-FR')}
+                      {formatDateFr(h.date_evenement)}
                     </div>
                     <div>
                       <span className="badge-gray">{historiqueLabels[h.type]}</span>
@@ -253,6 +313,52 @@ export default function EleveDetailPage() {
                     <FileText className="h-3.5 w-3.5" />
                   </button>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          {situation && canAccess(user?.role, 'finances') && (
+            <div className="card p-5">
+              <h3 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-2">
+                <Wallet className="h-4 w-4" />
+                Situation financière
+              </h3>
+              <p className="text-xs text-gray-500 mb-2">
+                {situation.statut === 'a_jour'
+                  ? 'À jour'
+                  : situation.statut === 'partiel'
+                    ? 'Paiement partiel'
+                    : 'Impayé'}
+              </p>
+              <p className="text-sm">
+                Payé : <strong>{formatMoney(situation.total_paye)}</strong>
+              </p>
+              <p className="text-sm">
+                Reste :{' '}
+                <strong className={situation.reste > 0 ? 'text-accent-red' : ''}>
+                  {formatMoney(situation.reste)}
+                </strong>
+              </p>
+              {situation.reste > 0 && (
+                <Link to={`/finances/paiement?eleve=${eleve.id}`} className="btn-secondary btn-sm mt-3">
+                  Enregistrer un paiement
+                </Link>
+              )}
+            </div>
+          )}
+
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-gray-500 mb-3">Changer le statut</h3>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(statutLabels) as StatutEleve[]).map((s) => (
+                <button
+                  key={s}
+                  className={`btn-sm ${eleve.statut === s ? 'btn-primary' : 'btn-secondary'}`}
+                  disabled={statutSaving || eleve.statut === s}
+                  onClick={() => handleStatut(s)}
+                >
+                  {statutLabels[s]}
+                </button>
               ))}
             </div>
           </div>

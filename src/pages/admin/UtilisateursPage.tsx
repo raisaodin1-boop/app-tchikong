@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, KeyRound } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { formatDateFr } from '../../lib/dates'
 import type { RoleUtilisateur, Utilisateur, UtilisateurFormData } from '@shared/types'
 
 const ROLE_OPTIONS: { value: RoleUtilisateur; label: string }[] = [
@@ -195,7 +196,7 @@ export default function UtilisateursPage() {
                 <td className="font-mono text-sm">{u.username}</td>
                 <td className="font-medium">{u.prenom} {u.nom}</td>
                 <td><span className="badge-gray capitalize">{u.role}</span></td>
-                <td className="text-gray-500 text-sm">{new Date(u.created_at).toLocaleDateString('fr-FR')}</td>
+                <td className="text-gray-500 text-sm">{formatDateFr(u.created_at)}</td>
                 <td>
                   <span className={u.actif ? 'badge-green' : 'badge-red'}>
                     {u.actif ? 'Actif' : 'Inactif'}

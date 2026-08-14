@@ -1,12 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, CreditCard, History, AlertCircle, Receipt } from 'lucide-react'
+import { LayoutDashboard, CreditCard, History, AlertCircle, Receipt, Tags } from 'lucide-react'
 
 const tabs = [
   { to: '/finances', icon: LayoutDashboard, label: "Vue d'ensemble", end: true },
   { to: '/finances/paiement', icon: CreditCard, label: 'Nouveau paiement' },
   { to: '/finances/historique', icon: History, label: 'Historique' },
   { to: '/finances/impayes', icon: AlertCircle, label: 'Impayés' },
-  { to: '/finances/depenses', icon: Receipt, label: 'Dépenses' }
+  { to: '/finances/depenses', icon: Receipt, label: 'Dépenses' },
+  { to: '/finances/tarifs', icon: Tags, label: 'Grille tarifaire' }
 ]
 
 export default function FinancesPage() {

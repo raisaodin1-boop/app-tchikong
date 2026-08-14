@@ -312,6 +312,8 @@ export interface GrilleTarifaire {
   type_frais: TypeFrais
   libelle: string
   montant: number
+  niveau_nom?: string
+  section_code?: SectionCode
 }
 
 export interface EcheancierPaiement {
@@ -645,6 +647,7 @@ export const IPC_CHANNELS = {
   ELEVE_UPDATE: 'eleve:update',
   ELEVE_DELETE: 'eleve:delete',
   ELEVE_SEARCH: 'eleve:search',
+  ELEVE_CHANGE_STATUT: 'eleve:changeStatut',
 
   // Parents
   PARENT_LIST: 'parent:list',
@@ -693,6 +696,8 @@ export const IPC_CHANNELS = {
   FINANCES_DASHBOARD: 'finances:dashboard',
   FINANCES_SITUATION: 'finances:situation',
   FINANCES_GRILLE: 'finances:grille',
+  FINANCES_GRILLE_UPSERT: 'finances:grilleUpsert',
+  FINANCES_GRILLE_DELETE: 'finances:grilleDelete',
   FINANCES_PAIEMENT_CREATE: 'finances:paiementCreate',
   FINANCES_PAIEMENT_LIST: 'finances:paiementList',
   FINANCES_IMPAYES: 'finances:impayes',

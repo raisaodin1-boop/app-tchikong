@@ -14,12 +14,12 @@ Application desktop de gestion scolaire pour le **Groupe Scolaire Bilingue Prima
 
 | Module | Statut |
 |--------|--------|
-| Socle technique (DB, auth, navigation) | ✅ |
-| Gestion des élèves (CRUD, recherche, présence) | ✅ |
+| Socle technique (DB, auth persistante, navigation, rôles) | ✅ |
+| Gestion des élèves (CRUD, recherche, présence, statuts) | ✅ |
 | Scolarité (notes, moyennes, bulletins PDF, palmarès) | ✅ |
 | Documents PDF (attestations, certificats, listes) | ✅ |
-| Finances (paiements, reçus PDF, impayés, dépenses) | ✅ |
-| Administratif (personnel, classes, utilisateurs, documents) | ✅ |
+| Finances (paiements, reçus PDF, impayés, dépenses, tarifs) | ✅ |
+| Administratif (personnel, classes, années, utilisateurs, documents) | ✅ |
 
 ## ⚠️ Important : ce n'est PAS un site web
 
@@ -90,7 +90,15 @@ shared/            # Types TypeScript partagés
 
 ## Sauvegarde
 
-La base de données SQLite est stockée localement. Utilisez le bouton **Sauvegarder** dans la barre latérale pour exporter une copie vers un fichier `.db`.
+La base de données SQLite est stockée localement. Utilisez **Sauvegarder** / **Restaurer** dans la barre latérale pour exporter ou réimporter un fichier `.db`.
+
+## Droits d'accès
+
+| Rôle | Accès |
+|------|--------|
+| Directrice | Tous les modules |
+| Secrétariat | Tableau de bord, élèves, présences, scolarité, administratif (sauf utilisateurs) |
+| Comptable | Tableau de bord, élèves, finances |
 
 ## Licence
 

@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       window.api
         .getSession(token)
-        .then((s) => {
+        .then((s: AuthSession | null) => {
           if (s) setSession(s)
           else localStorage.removeItem(TOKEN_KEY)
         })

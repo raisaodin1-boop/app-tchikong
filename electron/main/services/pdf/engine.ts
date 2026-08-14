@@ -3,7 +3,6 @@ import {
   PDFPage,
   PDFFont,
   StandardFonts,
-  rgb,
   type RGB
 } from 'pdf-lib'
 import { A4, MARGINS, SCHOOL, COLORS } from './config'

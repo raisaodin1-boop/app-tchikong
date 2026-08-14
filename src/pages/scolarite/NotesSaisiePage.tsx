@@ -23,7 +23,7 @@ export default function NotesSaisiePage() {
 
   useEffect(() => {
     if (!anneeActive) return
-    window.api.listPeriodes(anneeActive.id, 'sequence').then(setPeriodes)
+    window.api.listPeriodes(anneeActive.id).then(setPeriodes)
   }, [anneeActive])
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function NotesSaisiePage() {
     if (!classeId) return
     const classe = classes.find((c) => c.id === classeId)
     if (classe) {
-      window.api.listMatieres(classe.section_id).then((m) => {
+      window.api.listMatieres(classe.section_id).then((m: Matiere[]) => {
         setMatieres(m)
         if (m.length > 0 && !matiereId) setMatiereId(m[0].id)
       })
@@ -43,7 +43,7 @@ export default function NotesSaisiePage() {
 
   useEffect(() => {
     if (!classeId || !periodeId) return
-    window.api.getNotesGrid(classeId, periodeId).then((g) => {
+    window.api.getNotesGrid(classeId, periodeId).then((g: NotesGrid | null) => {
       setGrid(g)
       if (g && matiereId) {
         const initial: Record<number, { valeur: string; appreciation: string }> = {}
@@ -64,18 +64,36 @@ export default function NotesSaisiePage() {
     if (!token || !classeId || !periodeId || !matiereId) return
     setSaving(true)
 
-    const noteInputs: NoteInput[] = Object.entries(notes)
-      .filter(([, n]) => n.valeur !== '' && !isNaN(Number(n.valeur)))
-      .map(([eleveId, n]) => ({
+    const noteInputs: NoteInput[] = Object.entries(notes).map(([eleveId, n]) => {
+      const raw = n.valeur.trim()
+      if (raw === '') {
+        return { eleve_id: Number(eleveId), valeur: Number.NaN, appreciation: n.appreciation || undefined }
+      }
+      return {
         eleve_id: Number(eleveId),
-        valeur: Number(n.valeur),
+        valeur: Number(raw),
         note_sur: 20,
         appreciation: n.appreciation || undefined
-      }))
+      }
+    })
 
-    await window.api.saveNotes(classeId, periodeId, matiereId, noteInputs, token)
-    setSaving(false)
-    setSaved(true)
+    const invalid = noteInputs.find(
+      (n) => !Number.isNaN(n.valeur) && (n.valeur < 0 || n.valeur > 20)
+    )
+    if (invalid) {
+      alert('Les notes doivent être comprises entre 0 et 20')
+      setSaving(false)
+      return
+    }
+
+    try {
+      await window.api.saveNotes(classeId, periodeId, matiereId, noteInputs, token)
+      setSaved(true)
+    } catch (err) {
+      alert((err as Error).message || 'Erreur lors de l\'enregistrement des notes')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const selectedMatiere = matieres.find((m) => m.id === matiereId)
@@ -89,7 +107,10 @@ export default function NotesSaisiePage() {
             <select
               className="input"
               value={classeId}
-              onChange={(e) => setClasseId(Number(e.target.value))}
+              onChange={(e) => {
+                setClasseId(Number(e.target.value))
+                setMatiereId(0)
+              }}
             >
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -107,7 +128,7 @@ export default function NotesSaisiePage() {
             >
               {periodes.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.libelle}
+                  {p.libelle} ({p.type})
                 </option>
               ))}
             </select>
@@ -178,11 +199,13 @@ export default function NotesSaisiePage() {
                       className="input py-1 text-center"
                       value={notes[e.eleve_id]?.valeur ?? ''}
                       onChange={(ev) => {
+                        const v = ev.target.value
+                        if (v !== '' && (Number(v) < 0 || Number(v) > 20)) return
                         setNotes((prev) => ({
                           ...prev,
                           [e.eleve_id]: {
                             ...prev[e.eleve_id],
-                            valeur: ev.target.value
+                            valeur: v
                           }
                         }))
                         setSaved(false)

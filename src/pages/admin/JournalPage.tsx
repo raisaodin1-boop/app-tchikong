@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatDateTimeFr } from '../../lib/dates'
 import type { JournalActiviteDetail } from '@shared/types'
 
 const actionLabels: Record<string, string> = {
@@ -72,7 +73,7 @@ export default function JournalPage() {
               entries.map((e) => (
                 <tr key={e.id}>
                   <td className="text-sm text-gray-500 whitespace-nowrap">
-                    {new Date(e.created_at).toLocaleString('fr-FR')}
+                    {formatDateTimeFr(e.created_at)}
                   </td>
                   <td className="font-medium">{e.utilisateur_nom || 'Système'}</td>
                   <td>

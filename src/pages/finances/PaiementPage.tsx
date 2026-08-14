@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Search, Save, Printer, CheckCircle } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
+import { formatMoney } from '../../lib/money'
 import type { Inscription, ModePaiement, SituationFinanciere, TypeFrais, Paiement } from '@shared/types'
 
 const TYPE_FRAIS_OPTIONS: { value: TypeFrais; label: string }[] = [
@@ -21,13 +23,10 @@ const MODE_OPTIONS: { value: ModePaiement; label: string }[] = [
   { value: 'virement', label: 'Virement' }
 ]
 
-function formatMoney(n: number) {
-  return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
-}
-
 export default function PaiementPage() {
   const { token } = useAuth()
   const { anneeActive } = useApp()
+  const [searchParams] = useSearchParams()
   const [recherche, setRecherche] = useState('')
   const [resultats, setResultats] = useState<Inscription[]>([])
   const [eleveSelectionne, setEleveSelectionne] = useState<Inscription | null>(null)
@@ -63,13 +62,33 @@ export default function PaiementPage() {
       const sit = await window.api.getSituationFinanciere(eleve.eleve_id, anneeActive.id)
       setSituation(sit)
       if (sit) {
-        const detail = sit.details.find((d) => d.type_frais === 'scolarite')
+        const detail = sit.details.find((d: SituationFinanciere['details'][number]) => d.type_frais === 'scolarite')
         if (detail && detail.reste > 0) {
           setForm((f) => ({ ...f, type_frais: 'scolarite', montant: String(detail.reste) }))
         }
       }
     }
   }
+
+  useEffect(() => {
+    const eleveId = Number(searchParams.get('eleve'))
+    if (!eleveId || !anneeActive) return
+    window.api.getEleve(eleveId, anneeActive.id).then((data: {
+      eleve: { id: number; nom: string; prenom: string; matricule: string }
+      inscription: Inscription | null
+    } | null) => {
+      if (!data?.inscription && !data?.eleve) return
+      const ins = data.inscription
+      void selectionnerEleve({
+        ...(ins || {}),
+        eleve_id: data.eleve.id,
+        nom: data.eleve.nom,
+        prenom: data.eleve.prenom,
+        matricule: data.eleve.matricule
+      } as Inscription)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, anneeActive?.id])
 
   const handleTypeChange = (type: TypeFrais) => {
     const detail = situation?.details.find((d) => d.type_frais === type)
@@ -86,23 +105,40 @@ export default function PaiementPage() {
     const montant = Number(form.montant)
     if (!montant || montant <= 0) return
 
+    const detail = situation?.details.find((d) => d.type_frais === form.type_frais)
+    if (detail && montant > detail.reste) {
+      if (
+        !confirm(
+          `Le montant (${montant} FCFA) dépasse le reste dû (${detail.reste} FCFA). Enregistrer quand même ?`
+        )
+      ) {
+        return
+      }
+    }
+
     setSaving(true)
-    const paiement = await window.api.createPaiement(
-      {
-        eleve_id: eleveSelectionne.eleve_id,
-        annee_scolaire_id: anneeActive.id,
-        type_frais: form.type_frais,
-        montant,
-        mode_paiement: form.mode_paiement,
-        date_paiement: form.date_paiement,
-        notes: form.notes || undefined
-      },
-      token
-    )
-    setDernierPaiement(paiement)
-    const sit = await window.api.getSituationFinanciere(eleveSelectionne.eleve_id, anneeActive.id)
-    setSituation(sit)
-    setSaving(false)
+    try {
+      const paiement = await window.api.createPaiement(
+        {
+          eleve_id: eleveSelectionne.eleve_id,
+          annee_scolaire_id: anneeActive.id,
+          type_frais: form.type_frais,
+          montant,
+          mode_paiement: form.mode_paiement,
+          date_paiement: form.date_paiement,
+          notes: form.notes || undefined
+        },
+        token
+      )
+      setDernierPaiement(paiement)
+      const sit = await window.api.getSituationFinanciere(eleveSelectionne.eleve_id, anneeActive.id)
+      setSituation(sit)
+      setForm((f) => ({ ...f, montant: '', notes: '' }))
+    } catch (err) {
+      alert((err as Error).message || 'Erreur lors de l\'enregistrement')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handlePrintRecu = async (action: 'save' | 'print') => {

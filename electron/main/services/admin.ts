@@ -82,11 +82,17 @@ function mapEnseignant(row: Record<string, unknown>): Enseignant {
   }
 }
 
-function generateMatriculePersonnel(): string {
+function generatePersonnelMatricule(): string {
   const year = new Date().getFullYear()
-  const count =
-    (getDb().prepare('SELECT COUNT(*) as c FROM enseignants').get() as { c: number }).c + 1
-  return `PER-${year}-${String(count).padStart(4, '0')}`
+  const prefix = `PER-${year}-`
+  const row = getDb()
+    .prepare(
+      `SELECT MAX(CAST(substr(matricule, length(?) + 1) AS INTEGER)) as n
+       FROM enseignants WHERE matricule LIKE ?`
+    )
+    .get(prefix, `${prefix}%`) as { n: number | null }
+  const next = (row.n || 0) + 1
+  return `${prefix}${String(next).padStart(4, '0')}`
 }
 
 // --- Dashboard ---
@@ -156,7 +162,7 @@ export function getPersonnel(id: number): Enseignant | null {
 
 export function createPersonnel(data: PersonnelFormData, userId?: number): Enseignant {
   const db = getDb()
-  const matricule = data.matricule || generateMatriculePersonnel()
+  const matricule = data.matricule || generatePersonnelMatricule()
 
   const result = db
     .prepare(
@@ -271,7 +277,7 @@ export function updateUtilisateur(
     data.nom ?? current.nom,
     data.prenom ?? current.prenom,
     data.role ?? current.role,
-    data.actif !== undefined ? (data.actif ? 1 : 0) : current.actif,
+    data.actif !== undefined ? (data.actif ? 1 : 0) : current.actif ? 1 : 0,
     id
   )
 

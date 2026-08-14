@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApp } from '../../contexts/AppContext'
+import { formatDateFr } from '../../lib/dates'
+import { formatMoney } from '../../lib/money'
 import type { Depense, TypeDepense } from '@shared/types'
-
-function formatMoney(n: number) {
-  return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
-}
 
 const TYPE_OPTIONS: { value: TypeDepense; label: string }[] = [
   { value: 'salaire', label: 'Salaire' },
@@ -127,7 +125,7 @@ export default function DepensesPage() {
             ) : (
               depenses.map((d) => (
                 <tr key={d.id}>
-                  <td>{new Date(d.date_depense).toLocaleDateString('fr-FR')}</td>
+                  <td>{formatDateFr(d.date_depense)}</td>
                   <td><span className="badge-gray capitalize">{d.type}</span></td>
                   <td className="font-medium">{d.libelle}</td>
                   <td className="text-gray-500">{d.beneficiaire || '—'}</td>

@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Printer, FileDown, Phone } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../contexts/AppContext'
+import { formatMoney } from '../../lib/money'
 import type { ImpayeEleve } from '@shared/types'
-
-function formatMoney(n: number) {
-  return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
-}
 
 export default function ImpayesPage() {
   const { anneeActive, classes } = useApp()
+  const navigate = useNavigate()
   const [impayes, setImpayes] = useState<ImpayeEleve[]>([])
   const [classeId, setClasseId] = useState<number | ''>('')
   const [loading, setLoading] = useState(true)
@@ -17,7 +16,7 @@ export default function ImpayesPage() {
   useEffect(() => {
     if (!anneeActive) return
     setLoading(true)
-    window.api.listImpayes(anneeActive.id, classeId || undefined).then((data) => {
+    window.api.listImpayes(anneeActive.id, classeId || undefined).then((data: ImpayeEleve[]) => {
       setImpayes(data)
       setLoading(false)
     })
@@ -28,7 +27,12 @@ export default function ImpayesPage() {
   const handleExport = async (action: 'save' | 'print') => {
     if (!anneeActive) return
     setExporting(true)
-    const result = await window.api.exportImpayesPdf(anneeActive.id, anneeActive.libelle, action)
+    const result = await window.api.exportImpayesPdf(
+      anneeActive.id,
+      anneeActive.libelle,
+      action,
+      classeId || undefined
+    )
     if (result.success && action === 'save' && result.path) {
       alert(`Liste enregistrée : ${result.path}`)
     }
@@ -90,7 +94,11 @@ export default function ImpayesPage() {
               </td></tr>
             ) : (
               impayes.map((i) => (
-                <tr key={i.eleve_id}>
+                <tr
+                  key={i.eleve_id}
+                  onClick={() => navigate(`/finances/paiement?eleve=${i.eleve_id}`)}
+                  title="Enregistrer un paiement"
+                >
                   <td className="font-mono text-xs">{i.matricule}</td>
                   <td className="font-medium">{i.nom}</td>
                   <td>{i.prenom}</td>

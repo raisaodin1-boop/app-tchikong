@@ -115,6 +115,14 @@ export default function BulletinsPage() {
     setExporting(null)
   }
 
+  const handleExportTous = async () => {
+    if (rows.length === 0) return
+    if (!confirm(`Générer le PDF de ${rows.length} bulletin(s) un par un ?`)) return
+    for (const row of rows) {
+      await handleExportPdf(row.eleve_id, 'save')
+    }
+  }
+
   return (
     <div>
       <div className="card p-4 mb-4">
@@ -155,6 +163,12 @@ export default function BulletinsPage() {
           <RefreshCw className={`h-4 w-4 ${generating ? 'animate-spin' : ''}`} />
           {generating ? 'Génération...' : 'Calculer moyennes et générer bulletins'}
         </button>
+        {rows.length > 0 && (
+          <button className="btn-secondary btn-sm" onClick={handleExportTous} disabled={exporting !== null}>
+            <FileDown className="h-4 w-4" />
+            Enregistrer tous les PDF
+          </button>
+        )}
       </div>
 
       {rows.length === 0 ? (

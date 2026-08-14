@@ -57,6 +57,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ANNEE_LIST, () => referentielService.listAnnees())
   ipcMain.handle(IPC_CHANNELS.ANNEE_GET_ACTIVE, () => referentielService.getActiveAnnee())
   ipcMain.handle(IPC_CHANNELS.ANNEE_CREATE, (_, data) => referentielService.createAnnee(data))
+  ipcMain.handle(IPC_CHANNELS.ANNEE_SET_ACTIVE, (_, id) => referentielService.setActiveAnnee(id))
   ipcMain.handle(IPC_CHANNELS.CLASSE_LIST, (_, anneeId) =>
     referentielService.listClasses(anneeId)
   )
@@ -80,6 +81,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ELEVE_SEARCH, (_, term, anneeId) =>
     elevesService.searchEleves(term, anneeId)
   )
+  ipcMain.handle(IPC_CHANNELS.ELEVE_CHANGE_STATUT, (_, id, statut, anneeId, description, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return elevesService.changeStatutEleve(id, statut, anneeId, description, userId ?? undefined)
+  })
 
   // Présence
   ipcMain.handle(IPC_CHANNELS.PRESENCE_GET, (_, classeId, date) =>
@@ -213,14 +218,18 @@ export function registerIpcHandlers(): void {
         type.replace(/_/g, ' ')
       )
 
-      if (result.success && result.path) {
-        documentsService.enregistrerDocumentOfficiel(
-          eleveId,
-          type,
-          result.path.split('/').pop() || type,
-          JSON.stringify(data),
-          userId ?? undefined
-        )
+      if (result.success) {
+        try {
+          documentsService.enregistrerDocumentOfficiel(
+            eleveId,
+            type,
+            result.path || type,
+            JSON.stringify(data),
+            userId ?? undefined
+          )
+        } catch (err) {
+          console.error('Enregistrement document officiel:', err)
+        }
       }
 
       return result
@@ -254,6 +263,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE, (_, anneeId) =>
     financesService.listGrilleTarifaire(anneeId)
   )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE_UPSERT, (_, data, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return financesService.upsertTarif(data, userId ?? undefined)
+  })
+  ipcMain.handle(IPC_CHANNELS.FINANCES_GRILLE_DELETE, (_, id, token) => {
+    const userId = authService.getCurrentUserId(token)
+    return financesService.deleteTarif(id, userId ?? undefined)
+  })
   ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_CREATE, (_, data, token) => {
     const userId = authService.getCurrentUserId(token)
     return financesService.createPaiement(data, userId ?? undefined)
@@ -281,8 +298,8 @@ export function registerIpcHandlers(): void {
       'Reçu de paiement'
     )
   })
-  ipcMain.handle(IPC_CHANNELS.FINANCES_IMPAYES_PDF, async (_, anneeId, anneeLibelle, action = 'save') => {
-    const impayes = financesService.listImpayes(anneeId)
+  ipcMain.handle(IPC_CHANNELS.FINANCES_IMPAYES_PDF, async (_, anneeId, anneeLibelle, action = 'save', classeId) => {
+    const impayes = financesService.listImpayes(anneeId, classeId)
     return handlePdfAction(
       { type: 'liste_impayes', data: { anneeLibelle: anneeLibelle || '', impayes } },
       action as 'save' | 'print',

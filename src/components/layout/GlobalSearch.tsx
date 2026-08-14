@@ -43,6 +43,7 @@ export default function GlobalSearch() {
     setOpen(false)
     setQuery('')
     if (r.type === 'eleve') navigate(`/eleves/${r.id}`)
+    if (r.type === 'enseignant') navigate('/admin/personnel')
   }
 
   return (
