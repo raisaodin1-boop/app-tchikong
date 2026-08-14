@@ -13,8 +13,8 @@ export const MARGINS = {
 export const SCHOOL = {
   name: 'GROUPE SCOLAIRE BILINGUE',
   subtitle: 'PRIMAIRE ET MATERNELLE TCHIKONG',
-  address: 'Quartier Nkomo, Douala — Cameroun',
-  phone: '',
+  address: 'Passage à niveau Nyalla Rail, Douala — Cameroun',
+  phone: 'Tél. : 676379007 / 689688435',
   email: '',
   bp: ''
 }

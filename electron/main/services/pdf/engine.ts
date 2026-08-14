@@ -136,24 +136,25 @@ export class PdfBuilder {
     this.drawCentered('DÉLÉGATION RÉGIONALE DU LITTORAL', cx, this.y, 7)
     this.moveY(16)
 
-    // École — bloc central
-    const boxY = this.y - 50
+    // École — bloc central (nom, adresse, téléphone)
+    const boxHeight = 66
+    const boxY = this.y - boxHeight + 2
     this.page.drawRectangle({
       x: MARGINS.left + 40,
       y: boxY,
       width: this.contentWidth - 80,
-      height: 52,
+      height: boxHeight,
       color: COLORS.primaryLight,
       borderColor: COLORS.primary,
       borderWidth: 1
     })
 
-    this.drawCentered(SCHOOL.name, cx, this.y - 14, 11, true, COLORS.primary)
-    this.drawCentered(SCHOOL.subtitle, cx, this.y - 28, 10, true, COLORS.primary)
+    this.drawCentered(SCHOOL.name, cx, this.y - 12, 11, true, COLORS.primary)
+    this.drawCentered(SCHOOL.subtitle, cx, this.y - 26, 10, true, COLORS.primary)
     this.drawCentered(SCHOOL.address, cx, this.y - 40, 8, false, COLORS.textMuted)
     const contacts = [SCHOOL.phone, SCHOOL.email].filter(Boolean).join('  |  ')
     if (contacts) {
-      this.drawCentered(contacts, cx, this.y - 50, 7, false, COLORS.textMuted)
+      this.drawCentered(contacts, cx, this.y - 52, 8, false, COLORS.textMuted)
     }
 
     this.y = boxY - 16
