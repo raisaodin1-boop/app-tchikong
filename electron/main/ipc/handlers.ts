@@ -404,6 +404,18 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.FINANCES_PAIEMENT_LIST, (_, filtres) =>
     financesService.listPaiements(filtres)
   )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_CAISSE, (_, anneeId, date) =>
+    financesService.getCaisseJournaliere(anneeId, date)
+  )
+  ipcMain.handle(IPC_CHANNELS.FINANCES_CAISSE_PDF, async (_, anneeId, date, action = 'save') => {
+    const data = financesService.getCaisseJournaliere(anneeId, date)
+    return handlePdfAction(
+      { type: 'caisse_journaliere', data },
+      action as 'save' | 'print',
+      date,
+      'Caisse journalière'
+    )
+  })
   ipcMain.handle(IPC_CHANNELS.FINANCES_IMPAYES, (_, anneeId, classeId) =>
     financesService.listImpayes(anneeId, classeId)
   )

@@ -21,6 +21,7 @@ import ImpayesPage from './pages/finances/ImpayesPage'
 import DepensesPage from './pages/finances/DepensesPage'
 import BilanAnnuelPage from './pages/finances/BilanAnnuelPage'
 import EcheancierPage from './pages/finances/EcheancierPage'
+import CaisseJournalierePage from './pages/finances/CaisseJournalierePage'
 import AdminPage from './pages/admin/AdminPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import PersonnelPage from './pages/admin/PersonnelPage'
@@ -147,6 +148,7 @@ export default function App() {
           }
         >
           <Route index element={<FinancesDashboardPage />} />
+          <Route path="caisse" element={<CaisseJournalierePage />} />
           <Route path="paiement" element={<PaiementPage />} />
           <Route path="historique" element={<HistoriquePage />} />
           <Route path="impayes" element={<ImpayesPage />} />

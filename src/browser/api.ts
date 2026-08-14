@@ -509,6 +509,12 @@ const browserApi = {
     return mutate(() => financesService.annulerPaiement(id, userId(token)))
   },
   listPaiements: async (filters?: PaiementFiltres) => financesService.listPaiements(filters),
+  getCaisseJournaliere: async (anneeId: number, date: string) =>
+    financesService.getCaisseJournaliere(anneeId, date),
+  exportCaissePdf: async (anneeId: number, date: string, action: 'save' | 'print' = 'save') => {
+    const data = financesService.getCaisseJournaliere(anneeId, date)
+    return handlePdf({ type: 'caisse_journaliere', data }, action, date)
+  },
   listImpayes: async (anneeId: number, classeId?: number) =>
     financesService.listImpayes(anneeId, classeId),
   listDepenses: async (anneeId: number) => financesService.listDepenses(anneeId),

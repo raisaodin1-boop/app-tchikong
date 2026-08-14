@@ -585,6 +585,41 @@ export interface FinancesDashboard {
   recettes_par_section: { section: string; montant: number }[]
 }
 
+export interface CaisseLigne {
+  id: number
+  numero_recu: string
+  nom: string
+  prenom: string
+  matricule: string
+  classe_nom: string
+  type_frais: TypeFrais
+  mode_paiement: ModePaiement
+  montant: number
+  notes: string | null
+  annule?: number
+}
+
+export interface CaisseTotaux {
+  cle: string
+  libelle: string
+  nombre: number
+  montant: number
+}
+
+export interface CaisseJournaliere {
+  date: string
+  annee_libelle: string
+  total_encaisse: number
+  nombre_recus: number
+  total_annule: number
+  nombre_annules: number
+  especes: number
+  autres_modes: number
+  par_mode: CaisseTotaux[]
+  par_type: CaisseTotaux[]
+  paiements: CaisseLigne[]
+}
+
 export interface PersonnelAnneeDetail {
   id: number
   personnel_id: number
@@ -955,6 +990,8 @@ export const IPC_CHANNELS = {
   FINANCES_PAIEMENT_CREATE: 'finances:paiementCreate',
   FINANCES_PAIEMENT_ANNULER: 'finances:paiementAnnuler',
   FINANCES_PAIEMENT_LIST: 'finances:paiementList',
+  FINANCES_CAISSE: 'finances:caisse',
+  FINANCES_CAISSE_PDF: 'finances:caissePdf',
   FINANCES_IMPAYES: 'finances:impayes',
   FINANCES_RECU_PDF: 'finances:recuPdf',
   FINANCES_IMPAYES_PDF: 'finances:impayesPdf',

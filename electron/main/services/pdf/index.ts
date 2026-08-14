@@ -11,10 +11,11 @@ import {
 import { templateListeClasse } from './templates/liste-classe'
 import { templateAnnuaireClasse } from './templates/annuaire'
 import { templateRecuPaiement, templateListeImpayes } from './templates/recu'
+import { templateCaisseJournaliere } from './templates/caisse'
 import type { BulletinData } from '../scolarite'
 import type { AttestationData, AnnuaireClasseData } from '../documents'
 import type { EleveMoyenne } from '../scolarite'
-import type { PeriodeEvaluation } from '../../../../shared/types'
+import type { CaisseJournaliere, PeriodeEvaluation } from '../../../../shared/types'
 import type { ListeClasseData } from './templates/liste-classe'
 import type { RecuData } from '../finances'
 import { todayIso } from './utils'
@@ -42,6 +43,7 @@ export type PdfPayload =
       type: 'liste_impayes'
       data: { anneeLibelle: string; impayes: ListeImpayesItem[] }
     }
+  | { type: 'caisse_journaliere'; data: CaisseJournaliere }
 
 export interface ListeImpayesItem {
   matricule: string
@@ -98,6 +100,8 @@ export async function generatePdf(payload: PdfPayload): Promise<Uint8Array> {
       return templateRecuPaiement(payload.data)
     case 'liste_impayes':
       return templateListeImpayes(payload.data.anneeLibelle, payload.data.impayes)
+    case 'caisse_journaliere':
+      return templateCaisseJournaliere(payload.data)
     default:
       throw new Error(`Type de document inconnu: ${(payload as { type: string }).type}`)
   }
@@ -116,7 +120,8 @@ export function getDefaultFilename(type: DocumentType, identifier: string): stri
     liste_classe: `liste-classe-${identifier}-${date}.pdf`,
     annuaire_classe: `annuaire-parents-${identifier}-${date}.pdf`,
     recu_paiement: `recu-${identifier}-${date}.pdf`,
-    liste_impayes: `impayes-${identifier}-${date}.pdf`
+    liste_impayes: `impayes-${identifier}-${date}.pdf`,
+    caisse_journaliere: `caisse-${identifier}-${date}.pdf`
   }
   return names[type] || `document-${date}.pdf`
 }

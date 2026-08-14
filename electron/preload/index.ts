@@ -222,6 +222,13 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_ANNULER, id, token),
   listPaiements: (filtres?: import('../../shared/types').PaiementFiltres) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_PAIEMENT_LIST, filtres),
+  getCaisseJournaliere: (
+    anneeId: number,
+    date: string
+  ): Promise<import('../../shared/types').CaisseJournaliere> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_CAISSE, anneeId, date),
+  exportCaissePdf: (anneeId: number, date: string, action?: 'save' | 'print') =>
+    ipcRenderer.invoke(IPC_CHANNELS.FINANCES_CAISSE_PDF, anneeId, date, action ?? 'save'),
   listImpayes: (anneeId: number, classeId?: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.FINANCES_IMPAYES, anneeId, classeId),
   listDepenses: (anneeId: number) =>

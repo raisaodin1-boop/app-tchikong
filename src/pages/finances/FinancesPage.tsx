@@ -1,9 +1,19 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, CreditCard, History, AlertCircle, Receipt, BarChart3, CalendarClock } from 'lucide-react'
+import {
+  LayoutDashboard,
+  CreditCard,
+  History,
+  AlertCircle,
+  Receipt,
+  BarChart3,
+  CalendarClock,
+  Banknote
+} from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
 const tabs = [
   { to: '/finances', icon: LayoutDashboard, label: "Vue d'ensemble", end: true },
+  { to: '/finances/caisse', icon: Banknote, label: 'Caisse journalière' },
   { to: '/finances/paiement', icon: CreditCard, label: 'Nouveau paiement' },
   { to: '/finances/historique', icon: History, label: 'Historique' },
   { to: '/finances/impayes', icon: AlertCircle, label: 'Impayés' },
@@ -22,7 +32,7 @@ export default function FinancesPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Module Finances</h1>
         <p className="text-sm text-gray-500">
-          Frais de scolarité, paiements, reçus et suivi des impayés
+          Frais de scolarité, caisse du jour, paiements, reçus et suivi des impayés
         </p>
       </div>
 

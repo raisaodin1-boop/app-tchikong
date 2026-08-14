@@ -55,7 +55,8 @@ export function generateDocumentNumber(type: string): string {
     certificat_radiation: 'RAD',
     liste_classe: 'LST',
     annuaire_classe: 'ANN',
-    bulletins_classe: 'BUL'
+    bulletins_classe: 'BUL',
+    caisse_journaliere: 'CAI'
   }
   return `${prefix[type] || 'DOC'}-${year}-${seq}`
 }

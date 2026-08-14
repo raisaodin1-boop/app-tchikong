@@ -1,6 +1,7 @@
 import { getDb, logActivity } from '@database'
 import type {
   BilanAnnuel,
+  CaisseJournaliere,
   Depense,
   EcheanceDetail,
   EcheancierPaiement,
@@ -498,6 +499,81 @@ export function listPaiements(filtres: PaiementFiltres = {}): (Paiement & {
     matricule: string
     classe_nom: string
   })[]
+}
+
+export function getCaisseJournaliere(anneeScolaireId: number, date: string): CaisseJournaliere {
+  const annee = getDb()
+    .prepare('SELECT libelle FROM annees_scolaires WHERE id = ?')
+    .get(anneeScolaireId) as { libelle: string } | undefined
+
+  const paiements = listPaiements({
+    annee_scolaire_id: anneeScolaireId,
+    date_debut: date,
+    date_fin: date
+  })
+  const actifs = paiements.filter((p) => !p.annule)
+  const annules = paiements.filter((p) => p.annule)
+
+  const modes: ModePaiement[] = ['especes', 'mobile_money', 'cheque', 'virement']
+  const par_mode = modes.map((mode) => {
+    const rows = actifs.filter((p) => p.mode_paiement === mode)
+    return {
+      cle: mode,
+      libelle: MODE_PAIEMENT_LABELS[mode],
+      nombre: rows.length,
+      montant: rows.reduce((sum, p) => sum + p.montant, 0)
+    }
+  })
+
+  const types: TypeFrais[] = [
+    'inscription',
+    'scolarite',
+    'uniforme',
+    'fournitures',
+    'examen',
+    'activite',
+    'autre'
+  ]
+  const par_type = types
+    .map((type) => {
+      const rows = actifs.filter((p) => p.type_frais === type)
+      return {
+        cle: type,
+        libelle: TYPE_FRAIS_LABELS[type],
+        nombre: rows.length,
+        montant: rows.reduce((sum, p) => sum + p.montant, 0)
+      }
+    })
+    .filter((row) => row.nombre > 0)
+
+  const especes = par_mode.find((row) => row.cle === 'especes')?.montant ?? 0
+  const total_encaisse = actifs.reduce((sum, p) => sum + p.montant, 0)
+
+  return {
+    date,
+    annee_libelle: annee?.libelle || '',
+    total_encaisse,
+    nombre_recus: actifs.length,
+    total_annule: annules.reduce((sum, p) => sum + p.montant, 0),
+    nombre_annules: annules.length,
+    especes,
+    autres_modes: total_encaisse - especes,
+    par_mode,
+    par_type,
+    paiements: paiements.map((p) => ({
+      id: p.id,
+      numero_recu: p.numero_recu,
+      nom: p.nom,
+      prenom: p.prenom,
+      matricule: p.matricule,
+      classe_nom: p.classe_nom,
+      type_frais: p.type_frais,
+      mode_paiement: p.mode_paiement,
+      montant: p.montant,
+      notes: p.notes,
+      annule: p.annule
+    }))
+  }
 }
 
 export function getRecuData(paiementId: number): RecuData | null {

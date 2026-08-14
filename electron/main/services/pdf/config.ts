@@ -70,6 +70,7 @@ export type DocumentType =
   | 'bulletins_classe'
   | 'recu_paiement'
   | 'liste_impayes'
+  | 'caisse_journaliere'
 
 export const DOCUMENT_TITLES: Record<DocumentType, string> = {
   bulletin: 'BULLETIN DE NOTES',
@@ -82,5 +83,6 @@ export const DOCUMENT_TITLES: Record<DocumentType, string> = {
   annuaire_classe: 'ANNUAIRE DES PARENTS',
   bulletins_classe: 'BULLETINS DE CLASSE',
   recu_paiement: 'REÇU DE PAIEMENT',
-  liste_impayes: 'LISTE DES IMPAYÉS'
+  liste_impayes: 'LISTE DES IMPAYÉS',
+  caisse_journaliere: 'CAISSE JOURNALIÈRE'
 }
