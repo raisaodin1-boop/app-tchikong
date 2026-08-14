@@ -38,19 +38,34 @@ export default function CaisseJournalierePage() {
   const [caisse, setCaisse] = useState<CaisseJournaliere | null>(null)
   const [loading, setLoading] = useState(true)
   const [printing, setPrinting] = useState(false)
-
-  const load = async () => {
-    if (!anneeActive) return
-    setLoading(true)
-    try {
-      setCaisse(await window.api.getCaisseJournaliere(anneeActive.id, date))
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [error, setError] = useState('')
 
   useEffect(() => {
+    if (!anneeActive) return
+    let cancelled = false
+
+    const load = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const data = await window.api.getCaisseJournaliere(anneeActive.id, date)
+        if (!cancelled) setCaisse(data)
+      } catch (reason) {
+        if (!cancelled) {
+          setCaisse(null)
+          setError(
+            reason instanceof Error ? reason.message : 'Impossible de charger la caisse journalière'
+          )
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
     void load()
+    return () => {
+      cancelled = true
+    }
   }, [anneeActive?.id, date])
 
   const handlePdf = async (action: 'save' | 'print') => {
@@ -143,7 +158,9 @@ export default function CaisseJournalierePage() {
         </div>
       </div>
 
-      {loading || !caisse ? (
+      {error ? (
+        <div className="card p-8 text-center text-red-600">{error}</div>
+      ) : loading || !caisse ? (
         <div className="card p-8 text-center text-gray-400">Chargement...</div>
       ) : (
         <>

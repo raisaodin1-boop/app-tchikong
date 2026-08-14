@@ -210,10 +210,17 @@ export function getDb(): BrowserDatabase {
 }
 
 export async function flushDatabase(): Promise<void> {
-  if (!dirty) return persistQueue
-  dirty = false
-  const bytes = requireDatabase().export()
-  persistQueue = persistQueue.then(() => writeStoredDatabase(bytes))
+  persistQueue = persistQueue.catch(() => undefined).then(async () => {
+    if (!dirty) return
+    const bytes = requireDatabase().export()
+    dirty = false
+    try {
+      await writeStoredDatabase(bytes)
+    } catch (error) {
+      dirty = true
+      throw error
+    }
+  })
   return persistQueue
 }
 

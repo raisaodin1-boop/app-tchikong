@@ -77,15 +77,16 @@ function runMigrations(database: Database.Database): void {
 
     const sqlPath = findMigrationFile(migration.file)
     if (!sqlPath) {
-      console.error(`Migration introuvable: ${migration.file}`)
-      continue
+      throw new Error(`Migration introuvable: ${migration.file}`)
     }
     const sql = readFileSync(sqlPath, 'utf-8')
-    database.exec(sql)
-
-    database
-      .prepare('INSERT INTO migrations (version, name) VALUES (?, ?)')
-      .run(migration.version, migration.name)
+    const apply = database.transaction(() => {
+      database.exec(sql)
+      database
+        .prepare('INSERT INTO migrations (version, name) VALUES (?, ?)')
+        .run(migration.version, migration.name)
+    })
+    apply()
   }
 }
 

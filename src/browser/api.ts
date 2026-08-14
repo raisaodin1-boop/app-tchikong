@@ -16,6 +16,7 @@ import {
 } from '../../electron/main/services/settings'
 import { generatePdf, getDefaultFilename, type PdfPayload } from '../../electron/main/services/pdf'
 import type { DocumentType } from '../../electron/main/services/pdf/config'
+import { todayIso } from '../lib/dates'
 import { seedDemoData, seedReferenceData } from '../../db/seed'
 import type {
   DocumentFiltres,
@@ -41,6 +42,12 @@ const BROWSER_SESSION_PREFIX = 'tchikong_browser_session_'
 
 function userId(token: string): number | undefined {
   return authService.getCurrentUserId(token) ?? undefined
+}
+
+function requireSession(token: string): number {
+  const session = authService.getSession(token)
+  if (!session) throw new Error('Session expirée. Veuillez vous reconnecter.')
+  return session.utilisateur.id
 }
 
 function requireDirector(token: string): void {
@@ -246,8 +253,9 @@ const browserApi = {
     }
   },
 
-  backupDb: async () => {
-    const filename = `tchikong-backup-${new Date().toISOString().slice(0, 10)}.db`
+  backupDb: async (token: string) => {
+    requireSession(token)
+    const filename = `tchikong-backup-${todayIso()}.db`
     downloadBytes(await exportDatabase(), filename, 'application/x-sqlite3')
     return { success: true, path: filename }
   },
@@ -294,9 +302,9 @@ const browserApi = {
   listEleves: async (filters?: EleveFiltres) => elevesService.listEleves(filters),
   getEleve: async (id: number, anneeId?: number) => elevesService.getEleve(id, anneeId),
   createEleve: async (data: EleveFormData, token: string) =>
-    mutate(() => elevesService.createEleve(data, userId(token))),
+    mutate(() => elevesService.createEleve(data, requireSession(token))),
   updateEleve: async (id: number, data: Partial<EleveFormData>, token: string) =>
-    mutate(() => elevesService.updateEleve(id, data, userId(token))),
+    mutate(() => elevesService.updateEleve(id, data, requireSession(token))),
   searchEleves: async (term: string, anneeId?: number) =>
     elevesService.searchEleves(term, anneeId),
   changeStatutEleve: async (
@@ -305,11 +313,14 @@ const browserApi = {
     anneeId: number | undefined,
     description: string | undefined,
     token: string
-  ) => mutate(() => elevesService.changeStatutEleve(id, statut, anneeId, description, userId(token))),
+  ) =>
+    mutate(() =>
+      elevesService.changeStatutEleve(id, statut, anneeId, description, requireSession(token))
+    ),
   getPresences: async (classeId: number, date: string) =>
     elevesService.getPresences(classeId, date),
   savePresences: async (data: PresenceJourData, token: string) => {
-    await mutate(() => elevesService.savePresences(data, userId(token)))
+    await mutate(() => elevesService.savePresences(data, requireSession(token)))
     return true
   },
   listHistorique: async (eleveId: number) =>
@@ -319,7 +330,7 @@ const browserApi = {
       elevesService.addHistorique(
         eleveId,
         data as Parameters<typeof elevesService.addHistorique>[1],
-        userId(token)
+        requireSession(token)
       )
     ),
 
@@ -456,6 +467,7 @@ const browserApi = {
     action: 'save' | 'print',
     token: string
   ) => {
+    requireSession(token)
     const data = documentsService.getAttestationData(eleveId, anneeId)
     if (!data) return { success: false, error: 'Données élève introuvables' }
     const result = await handlePdf({ type, data }, action, data.eleve.matricule)
@@ -466,7 +478,7 @@ const browserApi = {
           type === 'certificat_radiation' ? 'autre' : type,
           `${type}-${eleveId}-${Date.now()}`,
           JSON.stringify(data),
-          userId(token)
+          requireSession(token)
         )
       )
     }
@@ -634,11 +646,11 @@ const browserApi = {
     eleveId: number,
     data: { type: import('../../shared/types').TypeDocument; nom_fichier: string; contenu: string },
     token: string
-  ) => mutate(() => elevesService.addDocumentEleve(eleveId, data, userId(token))),
+  ) => mutate(() => elevesService.addDocumentEleve(eleveId, data, requireSession(token))),
   deleteDocumentEleve: async (id: number, token: string) =>
-    mutate(() => elevesService.deleteDocumentEleve(id, userId(token))),
+    mutate(() => elevesService.deleteDocumentEleve(id, requireSession(token))),
   setElevePhoto: async (eleveId: number, contenu: string | null, token: string) =>
-    mutate(() => elevesService.setElevePhoto(eleveId, contenu, userId(token))),
+    mutate(() => elevesService.setElevePhoto(eleveId, contenu, requireSession(token))),
   listCandidatsPassage: async (anneeSourceId: number, anneeCibleId: number) =>
     elevesService.listCandidatsPassage(anneeSourceId, anneeCibleId),
   inscrirePassage: async (
@@ -717,7 +729,7 @@ const browserApi = {
   runAutoBackup: async (force: boolean, token: string) => {
     requireDirector(token)
     const settings = getBackupSettings()
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayIso()
     if (!force && !settings.enabled) return { ran: false }
     if (!force && settings.lastDate === today) return { ran: false }
     const filename = `tchikong-${today}.db`
@@ -734,7 +746,7 @@ export async function installBrowserApi(): Promise<void> {
   await flushDatabase()
   window.api = browserApi
   const settings = getBackupSettings()
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIso()
   if (settings.enabled && settings.lastDate !== today) {
     const filename = `tchikong-${today}.db`
     downloadBytes(await exportDatabase(), filename, 'application/x-sqlite3')

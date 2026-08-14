@@ -1,4 +1,5 @@
 import { getDb, logActivity } from '@database'
+import { todayIso } from './pdf/utils'
 import type {
   Eleve,
   EleveFiltres,
@@ -404,12 +405,13 @@ export function changeStatutEleve(
 
     db.prepare(
       `INSERT INTO historique_eleves (eleve_id, annee_scolaire_id, type, description, date_evenement)
-       VALUES (?, ?, ?, ?, date('now'))`
+       VALUES (?, ?, ?, ?, ?)`
     ).run(
       id,
       anneeScolaireId ?? null,
       typeMap[statut] ?? 'evolution_comportement',
-      description || `Statut modifié : ${current.statut} → ${statut}`
+      description || `Statut modifié : ${current.statut} → ${statut}`,
+      todayIso()
     )
 
     logActivity(userId ?? null, 'modification', 'eleve', id, `statut=${statut}`)
@@ -650,12 +652,13 @@ export function inscrirePassage(
           ).run(statut, ligne.eleve_id, anneeSourceId)
           db.prepare(
             `INSERT INTO historique_eleves (eleve_id, annee_scolaire_id, type, description, date_evenement)
-             VALUES (?, ?, ?, ?, date('now'))`
+             VALUES (?, ?, ?, ?, ?)`
           ).run(
             ligne.eleve_id,
             anneeSourceId,
             ligne.decision === 'transfert' ? 'transfert_sortant' : 'changement_classe',
-            ligne.decision === 'transfert' ? 'Transfert sortant' : 'Fin de cycle / diplômé'
+            ligne.decision === 'transfert' ? 'Transfert sortant' : 'Fin de cycle / diplômé',
+            todayIso()
           )
           if (ligne.decision === 'transfert') result.transferes += 1
           else result.diplomes += 1
@@ -713,12 +716,13 @@ export function inscrirePassage(
         )
         db.prepare(
           `INSERT INTO historique_eleves (eleve_id, annee_scolaire_id, type, description, date_evenement)
-           VALUES (?, ?, ?, ?, date('now'))`
+           VALUES (?, ?, ?, ?, ?)`
         ).run(
           ligne.eleve_id,
           anneeCibleId,
           ligne.decision === 'redoublement' ? 'redoublement' : 'changement_classe',
-          ligne.decision === 'redoublement' ? 'Redoublement' : 'Admission dans la classe supérieure'
+          ligne.decision === 'redoublement' ? 'Redoublement' : 'Admission dans la classe supérieure',
+          todayIso()
         )
         if (ligne.decision === 'redoublement') result.redoublants += 1
         else result.inscrits += 1

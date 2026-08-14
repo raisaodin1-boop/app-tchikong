@@ -55,7 +55,8 @@ export function registerIpcHandlers(): void {
 
   // DB
   ipcMain.handle(IPC_CHANNELS.DB_GET_PATH, () => getDbPath())
-  ipcMain.handle(IPC_CHANNELS.DB_BACKUP, async () => {
+  ipcMain.handle(IPC_CHANNELS.DB_BACKUP, async (_, token) => {
+    requireSession(token)
     const result = await dialog.showSaveDialog({
       title: 'Sauvegarder la base de données',
       defaultPath: `tchikong-backup-${todayIso()}.db`,
@@ -129,19 +130,19 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ELEVE_LIST, (_, filtres) => elevesService.listEleves(filtres))
   ipcMain.handle(IPC_CHANNELS.ELEVE_GET, (_, id, anneeId) => elevesService.getEleve(id, anneeId))
   ipcMain.handle(IPC_CHANNELS.ELEVE_CREATE, (_, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return elevesService.createEleve(data, userId ?? undefined)
+    const session = requireSession(token)
+    return elevesService.createEleve(data, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.ELEVE_UPDATE, (_, id, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return elevesService.updateEleve(id, data, userId ?? undefined)
+    const session = requireSession(token)
+    return elevesService.updateEleve(id, data, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.ELEVE_SEARCH, (_, term, anneeId) =>
     elevesService.searchEleves(term, anneeId)
   )
   ipcMain.handle(IPC_CHANNELS.ELEVE_CHANGE_STATUT, (_, id, statut, anneeId, description, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return elevesService.changeStatutEleve(id, statut, anneeId, description, userId ?? undefined)
+    const session = requireSession(token)
+    return elevesService.changeStatutEleve(id, statut, anneeId, description, session.utilisateur.id)
   })
 
   // Présence
@@ -149,8 +150,8 @@ export function registerIpcHandlers(): void {
     elevesService.getPresences(classeId, date)
   )
   ipcMain.handle(IPC_CHANNELS.PRESENCE_SAVE, (_, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    elevesService.savePresences(data, userId ?? undefined)
+    const session = requireSession(token)
+    elevesService.savePresences(data, session.utilisateur.id)
     return true
   })
 
@@ -160,8 +161,8 @@ export function registerIpcHandlers(): void {
     return result?.historique ?? []
   })
   ipcMain.handle(IPC_CHANNELS.HISTORIQUE_ADD, (_, eleveId, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return elevesService.addHistorique(eleveId, data, userId ?? undefined)
+    const session = requireSession(token)
+    return elevesService.addHistorique(eleveId, data, session.utilisateur.id)
   })
 
   // Dashboard & Recherche
@@ -274,6 +275,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.DOCUMENT_GENERER,
     async (_, type, eleveId, anneeId, action = 'save', token) => {
+      const session = requireSession(token)
       const data = documentsService.getAttestationData(eleveId, anneeId)
       if (!data) return { success: false, error: 'Données élève introuvables' }
 
@@ -288,7 +290,6 @@ export function registerIpcHandlers(): void {
         return { success: false, error: 'Type de document invalide' }
       }
 
-      const userId = authService.getCurrentUserId(token)
       const result = await handlePdfAction(
         { type, data },
         action as 'save' | 'print',
@@ -296,13 +297,13 @@ export function registerIpcHandlers(): void {
         type.replace(/_/g, ' ')
       )
 
-      if (result.success && result.path) {
+      if (result.success) {
         documentsService.enregistrerDocumentOfficiel(
           eleveId,
           type === 'certificat_radiation' ? 'autre' : type,
-          result.path,
+          result.path || `${type}-${eleveId}-${Date.now()}`,
           JSON.stringify(data),
-          userId ?? undefined
+          session.utilisateur.id
         )
       }
 
@@ -573,16 +574,16 @@ export function registerIpcHandlers(): void {
     elevesService.listDocumentsEleve(eleveId)
   )
   ipcMain.handle(IPC_CHANNELS.ELEVE_DOCUMENT_ADD, (_, eleveId, data, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return elevesService.addDocumentEleve(eleveId, data, userId ?? undefined)
+    const session = requireSession(token)
+    return elevesService.addDocumentEleve(eleveId, data, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.ELEVE_DOCUMENT_DELETE, (_, id, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return elevesService.deleteDocumentEleve(id, userId ?? undefined)
+    const session = requireSession(token)
+    return elevesService.deleteDocumentEleve(id, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.ELEVE_PHOTO_SET, (_, eleveId, contenu, token) => {
-    const userId = authService.getCurrentUserId(token)
-    return elevesService.setElevePhoto(eleveId, contenu, userId ?? undefined)
+    const session = requireSession(token)
+    return elevesService.setElevePhoto(eleveId, contenu, session.utilisateur.id)
   })
   ipcMain.handle(IPC_CHANNELS.PASSAGE_CANDIDATS, (_, anneeSourceId, anneeCibleId) =>
     elevesService.listCandidatsPassage(anneeSourceId, anneeCibleId)

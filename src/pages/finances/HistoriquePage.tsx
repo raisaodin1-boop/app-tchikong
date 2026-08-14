@@ -29,12 +29,17 @@ export default function HistoriquePage() {
   const load = async () => {
     if (!anneeActive) return
     setLoading(true)
-    const data = await window.api.listPaiements({
-      annee_scolaire_id: anneeActive.id,
-      recherche: recherche || undefined
-    })
-    setPaiements(data)
-    setLoading(false)
+    try {
+      const data = await window.api.listPaiements({
+        annee_scolaire_id: anneeActive.id,
+        recherche: recherche || undefined
+      })
+      setPaiements(data)
+    } catch {
+      setPaiements([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {

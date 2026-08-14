@@ -34,6 +34,7 @@ export default function PresencePage() {
 
   useEffect(() => {
     if (!classeId || !anneeActive) return
+    let cancelled = false
 
     const load = async () => {
       const [elevesList, existingPresences] = await Promise.all([
@@ -44,6 +45,7 @@ export default function PresencePage() {
         }),
         window.api.getPresences(classeId, date)
       ])
+      if (cancelled) return
 
       setEleves(elevesList)
 
@@ -60,7 +62,10 @@ export default function PresencePage() {
       setSaved(false)
     }
 
-    load()
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [classeId, date, anneeActive])
 
   const togglePresent = (eleveId: number) => {

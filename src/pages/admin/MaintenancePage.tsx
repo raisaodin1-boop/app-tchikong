@@ -54,7 +54,8 @@ export default function MaintenancePage() {
   }
 
   const manualBackup = async () => {
-    const result = await window.api.backupDb()
+    if (!token) return
+    const result = await window.api.backupDb(token)
     if (result.success) setMessage(`Sauvegarde : ${result.path}`)
   }
 

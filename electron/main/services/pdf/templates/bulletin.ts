@@ -1,6 +1,6 @@
 import { COLORS, MENTION_COLORS, MENTION_LABELS } from '../config'
 import { PdfBuilder } from '../engine'
-import { formatDate, generateDocumentNumber, ordinalFr } from '../utils'
+import { formatDate, generateDocumentNumber, ordinalFr, todayFormatted } from '../utils'
 import type { BulletinData } from '../../scolarite'
 
 export async function templateBulletin(data: BulletinData): Promise<Uint8Array> {
@@ -99,7 +99,7 @@ export async function templateBulletin(data: BulletinData): Promise<Uint8Array> 
       { title: 'Le Maître de classe', subtitle: data.classe.titulaire_nom || 'Nom et signature' },
       { title: 'La Directrice', subtitle: 'Cachet et signature' }
     ],
-    `Fait à Douala, le ${formatDate(new Date().toISOString())}`
+    `Fait à Douala, le ${todayFormatted()}`
   )
 
   return builder.build()

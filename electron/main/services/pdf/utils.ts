@@ -6,6 +6,12 @@ export function todayIso(): string {
   return `${y}-${m}-${d}`
 }
 
+export function nowLocalSql(): string {
+  const now = new Date()
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${todayIso()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+}
+
 function parseLocalDate(dateStr: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
   if (!match) {

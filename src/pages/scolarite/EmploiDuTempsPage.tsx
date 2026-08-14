@@ -84,8 +84,13 @@ export default function EmploiDuTempsPage() {
 
   const remove = async (id: number) => {
     if (!token || !confirm('Supprimer ce créneau ?')) return
-    await window.api.deleteEmploiDuTemps(id, token)
-    await load()
+    setError('')
+    try {
+      await window.api.deleteEmploiDuTemps(id, token)
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Impossible de supprimer le créneau')
+    }
   }
 
   const cell = (jour: number, debut: string) =>

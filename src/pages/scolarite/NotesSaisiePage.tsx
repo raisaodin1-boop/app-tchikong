@@ -44,6 +44,9 @@ export default function NotesSaisiePage() {
   useEffect(() => {
     if (!classeId || !periodeId) return
     let cancelled = false
+    setGrid(null)
+    setNotes({})
+    setSaved(false)
     window.api.getNotesGrid(classeId, periodeId).then((g: NotesGrid | null) => {
       if (cancelled) return
       setGrid(g)
@@ -57,7 +60,8 @@ export default function NotesSaisiePage() {
           }
         }
         setNotes(initial)
-        setSaved(false)
+      } else {
+        setNotes({})
       }
     })
     return () => {

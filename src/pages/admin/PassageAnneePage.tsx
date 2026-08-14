@@ -68,14 +68,24 @@ export default function PassageAnneePage() {
       const next = { ...current }
       for (const c of pending) {
         if (!next[c.eleve_id]?.included) continue
+        const nextClasses =
+          decision === 'redoublement'
+            ? classes.filter(
+                (cl) => cl.niveau_id === c.niveau_id && cl.section_id === c.section_id
+              )
+            : decision === 'admission'
+              ? classes.filter((cl) => {
+                  const dest = niveaux.find((n) => n.id === cl.niveau_id)
+                  return cl.section_id === c.section_id && dest?.ordre === c.niveau_ordre + 1
+                })
+              : []
         next[c.eleve_id] = {
           ...next[c.eleve_id],
           decision,
           classe_id:
-            decision === 'redoublement'
-              ? classes.find((cl) => cl.niveau_id === c.niveau_id && cl.section_id === c.section_id)
-                  ?.id ?? next[c.eleve_id].classe_id
-              : next[c.eleve_id].classe_id
+            decision === 'admission'
+              ? c.classe_cible_id ?? nextClasses[0]?.id ?? 0
+              : nextClasses[0]?.id ?? 0
         }
       }
       return next

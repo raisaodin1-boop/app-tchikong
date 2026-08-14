@@ -12,7 +12,7 @@ import type {
   TypeDepense,
   TypeFrais
 } from '../../../shared/types'
-import { todayIso } from './pdf/utils'
+import { nowLocalSql, todayIso } from './pdf/utils'
 
 const PAIEMENT_ACTIF = 'IFNULL(annule, 0) = 0'
 
@@ -260,7 +260,7 @@ export function deleteFraisConfiguration(id: number, userId?: number): boolean {
     | { id: number; libelle: string }
     | undefined
   if (!model) throw new Error('Module de frais introuvable')
-  if (db.prepare('SELECT 1 FROM paiements WHERE frais_modele_id = ? LIMIT 1').get(id)) {
+  if (db.prepare(`SELECT 1 FROM paiements WHERE frais_modele_id = ? AND ${PAIEMENT_ACTIF} LIMIT 1`).get(id)) {
     throw new Error('Ce module possède déjà des paiements et ne peut pas être supprimé')
   }
   db.prepare('DELETE FROM frais_modeles WHERE id = ?').run(id)
@@ -441,9 +441,9 @@ export function annulerPaiement(id: number, userId?: number): Paiement {
 
   db.prepare(
     `UPDATE paiements
-     SET annule = 1, annule_le = datetime('now'), annule_par = ?
+     SET annule = 1, annule_le = ?, annule_par = ?
      WHERE id = ?`
-  ).run(userId ?? null, id)
+  ).run(nowLocalSql(), userId ?? null, id)
 
   logActivity(userId ?? null, 'annulation', 'paiement', id, paiement.numero_recu)
 

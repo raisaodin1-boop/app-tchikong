@@ -2,6 +2,7 @@ import { app, dialog } from 'electron'
 import { existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'fs'
 import { join } from 'path'
 import { backupDatabase } from '@database'
+import { todayIso } from './pdf/utils'
 import {
   getBackupSettings,
   markBackupDone,
@@ -12,7 +13,7 @@ import {
 const KEEP_DAYS = 30
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10)
+  return todayIso()
 }
 
 function defaultDirectory(): string {

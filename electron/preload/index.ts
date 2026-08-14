@@ -35,8 +35,8 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_SESSION, token),
 
   // DB
-  backupDb: (): Promise<{ success: boolean; path?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.DB_BACKUP),
+  backupDb: (token: string): Promise<{ success: boolean; path?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DB_BACKUP, token),
   restoreDb: (token: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.DB_RESTORE, token),
   getDbPath: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.DB_GET_PATH),

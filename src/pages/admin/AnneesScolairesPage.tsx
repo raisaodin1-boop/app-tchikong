@@ -32,7 +32,8 @@ export default function AnneesScolairesPage() {
   }, [anneeActive?.id])
 
   const backup = async () => {
-    const result = await window.api.backupDb()
+    if (!token) return
+    const result = await window.api.backupDb(token)
     if (result.success) alert(`Sauvegarde téléchargée : ${result.path}`)
   }
 
