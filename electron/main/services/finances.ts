@@ -490,15 +490,18 @@ export function getRecuData(paiementId: number): RecuData | null {
 
   const eleve = db
     .prepare(
-      `SELECT e.nom, e.prenom, e.matricule, c.nom as classe_nom, s.code as section_code, a.libelle as annee_libelle
+      `SELECT e.nom, e.prenom, e.matricule,
+        COALESCE(c.nom, '') as classe_nom,
+        COALESCE(s.code, '') as section_code,
+        COALESCE(a.libelle, '') as annee_libelle
        FROM eleves e
-       JOIN inscriptions i ON i.eleve_id = e.id AND i.annee_scolaire_id = ?
-       JOIN classes c ON c.id = i.classe_id
-       JOIN sections s ON s.id = i.section_id
-       JOIN annees_scolaires a ON a.id = i.annee_scolaire_id
+       LEFT JOIN inscriptions i ON i.eleve_id = e.id AND i.annee_scolaire_id = ?
+       LEFT JOIN classes c ON c.id = i.classe_id
+       LEFT JOIN sections s ON s.id = i.section_id
+       LEFT JOIN annees_scolaires a ON a.id = ?
        WHERE e.id = ?`
     )
-    .get(paiement.annee_scolaire_id, paiement.eleve_id) as {
+    .get(paiement.annee_scolaire_id, paiement.annee_scolaire_id, paiement.eleve_id) as {
     nom: string
     prenom: string
     matricule: string

@@ -70,14 +70,85 @@ async function mutate<T>(operation: () => T): Promise<T> {
   return result
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength)
+  copy.set(bytes)
+  return copy.buffer
+}
+
+function toPdfBlob(bytes: Uint8Array): Blob {
+  return new Blob([toArrayBuffer(bytes)], { type: 'application/pdf' })
+}
+
 function downloadBytes(bytes: Uint8Array, filename: string, mimeType: string): void {
-  const copy = new Uint8Array(bytes)
-  const url = URL.createObjectURL(new Blob([copy.buffer], { type: mimeType }))
+  const url = URL.createObjectURL(new Blob([toArrayBuffer(bytes)], { type: mimeType }))
   const link = document.createElement('a')
   link.href = url
   link.download = filename
+  document.body.appendChild(link)
   link.click()
+  link.remove()
   setTimeout(() => URL.revokeObjectURL(url), 30_000)
+}
+
+function openPrintPreview(): Window | null {
+  const preview = window.open('about:blank', '_blank', 'width=920,height=740')
+  if (preview) {
+    preview.document.write(
+      '<!DOCTYPE html><title>Préparation du document…</title><p style="font-family:sans-serif;padding:2rem">Préparation du document…</p>'
+    )
+    preview.document.close()
+  }
+  return preview
+}
+
+async function printPdf(bytes: Uint8Array, preview: Window | null, filename: string): Promise<boolean> {
+  const url = URL.createObjectURL(toPdfBlob(bytes))
+  const revoke = () => setTimeout(() => URL.revokeObjectURL(url), 60_000)
+
+  if (preview && !preview.closed) {
+    preview.location.replace(url)
+    const triggerPrint = () => {
+      try {
+        preview.focus()
+        preview.print()
+      } catch {
+        /* le visualiseur PDF reste ouvert pour imprimer manuellement */
+      }
+    }
+    preview.addEventListener('load', triggerPrint)
+    setTimeout(triggerPrint, 600)
+    revoke()
+    return true
+  }
+
+  const iframe = document.createElement('iframe')
+  iframe.title = 'Impression'
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'
+  iframe.src = url
+  document.body.appendChild(iframe)
+
+  return new Promise((resolve) => {
+    let done = false
+    const finish = (ok: boolean) => {
+      if (done) return
+      done = true
+      try {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+        resolve(ok)
+      } catch {
+        downloadBytes(bytes, filename, 'application/pdf')
+        resolve(false)
+      }
+      setTimeout(() => {
+        iframe.remove()
+        URL.revokeObjectURL(url)
+      }, 60_000)
+    }
+    iframe.onload = () => finish(true)
+    setTimeout(() => finish(true), 800)
+  })
 }
 
 function chooseDatabaseFile(): Promise<Uint8Array | null> {
@@ -101,50 +172,28 @@ function chooseDatabaseFile(): Promise<Uint8Array | null> {
   })
 }
 
-async function printPdf(bytes: Uint8Array): Promise<boolean> {
-  const copy = new Uint8Array(bytes)
-  const url = URL.createObjectURL(new Blob([copy.buffer], { type: 'application/pdf' }))
-  const frame = document.createElement('iframe')
-  frame.style.position = 'fixed'
-  frame.style.width = '1px'
-  frame.style.height = '1px'
-  frame.style.opacity = '0'
-  frame.src = url
-  document.body.appendChild(frame)
-
-  return new Promise((resolve) => {
-    frame.onload = () => {
-      try {
-        frame.contentWindow?.focus()
-        frame.contentWindow?.print()
-        resolve(true)
-      } catch {
-        resolve(false)
-      } finally {
-        setTimeout(() => {
-          frame.remove()
-          URL.revokeObjectURL(url)
-        }, 60_000)
-      }
-    }
-  })
-}
-
 async function handlePdf(
   payload: PdfPayload,
   action: 'save' | 'print' = 'save',
   identifier: string
 ): Promise<PdfResult> {
+  const preview = action === 'print' ? openPrintPreview() : null
   try {
     const bytes = await generatePdf(payload)
     const filename = getDefaultFilename(payload.type as DocumentType, identifier)
     if (action === 'print') {
-      const printed = await printPdf(bytes)
-      return { success: printed, printed, error: printed ? undefined : 'Impression impossible' }
+      const printed = await printPdf(bytes, preview, filename)
+      return {
+        success: printed,
+        printed,
+        error: printed ? undefined : 'Impression bloquée : le PDF a été téléchargé'
+      }
     }
+    preview?.close()
     downloadBytes(bytes, filename, 'application/pdf')
     return { success: true, path: filename }
   } catch (error) {
+    if (preview && !preview.closed) preview.close()
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Erreur de génération PDF'

@@ -1,69 +1,76 @@
-import { writeFileSync, mkdirSync, existsSync } from 'fs'
+import { writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs'
 import { join } from 'path'
-import { app, BrowserWindow } from 'electron'
+import { pathToFileURL } from 'url'
+import { app, BrowserWindow, shell } from 'electron'
 
-export async function savePdf(
-  pdfBytes: Uint8Array,
-  filePath: string
-): Promise<void> {
+export async function savePdf(pdfBytes: Uint8Array, filePath: string): Promise<void> {
   writeFileSync(filePath, pdfBytes)
 }
 
-export async function printPdf(pdfBytes: Uint8Array, title = 'Document TCHIKONG'): Promise<boolean> {
+function writeTempPdf(pdfBytes: Uint8Array): string {
   const tempDir = join(app.getPath('temp'), 'tchikong-print')
   if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true })
-
   const tempPath = join(tempDir, `print-${Date.now()}.pdf`)
   writeFileSync(tempPath, pdfBytes)
+  return tempPath
+}
+
+/**
+ * Affiche le PDF puis ouvre le dialogue d’impression.
+ * Une fenêtre cachée ne déclenche souvent aucun dialogue (Windows / Linux).
+ */
+export async function printPdf(pdfBytes: Uint8Array, title = 'Document TCHIKONG'): Promise<boolean> {
+  const tempPath = writeTempPdf(pdfBytes)
+  const win = new BrowserWindow({
+    show: true,
+    width: 920,
+    height: 740,
+    title,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  })
+
+  try {
+    await win.loadURL(pathToFileURL(tempPath).href)
+  } catch {
+    if (!win.isDestroyed()) win.close()
+    const opened = await shell.openPath(tempPath)
+    return opened === ''
+  }
 
   return new Promise((resolve) => {
-    const win = new BrowserWindow({
-      show: false,
-      width: 800,
-      height: 600,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true
+    let settled = false
+    const finish = (ok: boolean) => {
+      if (settled) return
+      settled = true
+      resolve(ok)
+    }
+
+    win.webContents.print(
+      {
+        silent: false,
+        printBackground: true,
+        margins: { marginType: 'default' }
+      },
+      (success) => {
+        // Document déjà visible : on laisse la fenêtre ouverte si l’impression est annulée.
+        if (success && !win.isDestroyed()) win.close()
+        finish(success || !win.isDestroyed())
+        if (success) {
+          setTimeout(() => {
+            try {
+              unlinkSync(tempPath)
+            } catch {
+              /* ignore */
+            }
+          }, 5_000)
+        }
       }
-    })
+    )
 
-    const base64 = Buffer.from(pdfBytes).toString('base64')
-    const html = `<!DOCTYPE html>
-<html><head><title>${title}</title>
-<style>*{margin:0;padding:0}body{background:#525659}</style>
-</head><body>
-<embed src="data:application/pdf;base64,${base64}" type="application/pdf" width="100%" height="100%" />
-</body></html>`
-
-    win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-
-    win.webContents.on('did-finish-load', () => {
-      setTimeout(() => {
-        win.webContents.print(
-          {
-            silent: false,
-            printBackground: true,
-            margins: { marginType: 'default' }
-          },
-          (success) => {
-            win.close()
-            resolve(success)
-          }
-        )
-      }, 800)
-    })
-
-    win.webContents.on('did-fail-load', () => {
-      win.close()
-      resolve(false)
-    })
-
-    // Timeout de sécurité
-    setTimeout(() => {
-      if (!win.isDestroyed()) {
-        win.close()
-        resolve(false)
-      }
-    }, 30000)
+    win.on('closed', () => finish(true))
   })
 }

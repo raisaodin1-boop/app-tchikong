@@ -34,6 +34,7 @@ export default function PaiementPage() {
   const [saving, setSaving] = useState(false)
   const [dernierPaiement, setDernierPaiement] = useState<Paiement | null>(null)
   const [error, setError] = useState('')
+  const [printing, setPrinting] = useState(false)
 
   useEffect(() => {
     if (recherche.length < 2) {
@@ -141,9 +142,18 @@ export default function PaiementPage() {
 
   const handlePrintRecu = async (action: 'save' | 'print') => {
     if (!dernierPaiement) return
-    const result = await window.api.exportRecuPdf(dernierPaiement.id, action)
-    if (result.success && action === 'save' && result.path) {
-      alert(`Reçu enregistré : ${result.path}`)
+    setPrinting(true)
+    try {
+      const result = await window.api.exportRecuPdf(dernierPaiement.id, action)
+      if (result.success && action === 'save' && result.path) {
+        alert(`Reçu enregistré : ${result.path}`)
+      } else if (!result.success) {
+        alert(result.error || "Impossible d'imprimer le reçu")
+      }
+    } catch (reason) {
+      alert(reason instanceof Error ? reason.message : "Impossible d'imprimer le reçu")
+    } finally {
+      setPrinting(false)
     }
   }
 
@@ -343,10 +353,21 @@ export default function PaiementPage() {
             Montant : {formatMoney(dernierPaiement.montant)} — {dernierPaiement.date_paiement}
           </p>
           <div className="flex gap-2">
-            <button className="btn-primary btn-sm" onClick={() => handlePrintRecu('print')}>
-              <Printer className="h-4 w-4" /> Imprimer le reçu
+            <button
+              type="button"
+              className="btn-primary btn-sm"
+              disabled={printing}
+              onClick={() => void handlePrintRecu('print')}
+            >
+              <Printer className="h-4 w-4" />
+              {printing ? 'Préparation...' : 'Imprimer le reçu'}
             </button>
-            <button className="btn-secondary btn-sm" onClick={() => handlePrintRecu('save')}>
+            <button
+              type="button"
+              className="btn-secondary btn-sm"
+              disabled={printing}
+              onClick={() => void handlePrintRecu('save')}
+            >
               Enregistrer le reçu (PDF)
             </button>
           </div>

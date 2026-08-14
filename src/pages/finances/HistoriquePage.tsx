@@ -41,9 +41,15 @@ export default function HistoriquePage() {
   }, [anneeActive?.id, recherche])
 
   const handleRecu = async (id: number, action: 'save' | 'print') => {
-    const result = await window.api.exportRecuPdf(id, action)
-    if (result.success && action === 'save' && result.path) {
-      alert(`Reçu enregistré : ${result.path}`)
+    try {
+      const result = await window.api.exportRecuPdf(id, action)
+      if (result.success && action === 'save' && result.path) {
+        alert(`Reçu enregistré : ${result.path}`)
+      } else if (!result.success) {
+        alert(result.error || "Impossible d'imprimer le reçu")
+      }
+    } catch (reason) {
+      alert(reason instanceof Error ? reason.message : "Impossible d'imprimer le reçu")
     }
   }
 
